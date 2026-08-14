@@ -1,32 +1,134 @@
 {% extends "base.html" %}
 
-{% block title %}PicWise | Product Label Analysis{% endblock %}
+{% block title %}PicWise Dashboard{% endblock %}
 
 {% block content %}
-  <section class="hero">
-    <div class="hero-content">
-      <p class="eyebrow">AI-assisted product scanning</p>
-      <h1>PicWise</h1>
-      <p>
-        Upload a food or personal-care product label and PicWise will prepare it
-        for ingredient, nutrition, and safety lookup. Phase 1 uses a stubbed OCR
-        step while the website, API, and knowledge-base flow are wired end to end.
-      </p>
-      <a class="primary-action" href="/upload">Upload Product</a>
+  <section class="page-heading">
+    <h1>Welcome back, <span>Amisha!</span></h1>
+    <p>Let's help you make safer choices.</p>
+  </section>
+
+  <section class="dashboard-grid">
+    <div class="dashboard-main">
+      <section class="scan-hero card">
+        <div class="scan-drop-frame">
+          <div class="camera-bubble">
+            <span class="camera-icon"></span>
+          </div>
+          <div class="scan-copy">
+            <h2>Scan a Product</h2>
+            <p>Upload or capture a product label to check for allergens and get AI insights instantly.</p>
+            <a class="primary-action" href="/upload">
+              <span class="button-icon camera-small"></span>
+              Scan Now
+            </a>
+          </div>
+          <div class="product-illustration" aria-hidden="true">
+            <div class="bottle"><span></span></div>
+            <div class="leaf leaf-one"></div>
+            <div class="leaf leaf-two"></div>
+            <div class="chips">CHIPS</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="recent-section">
+        <div class="section-title-row">
+          <h2>Your Recent Scans</h2>
+          <a href="#">View all</a>
+        </div>
+
+        <div class="scan-list">
+          <article class="scan-row card">
+            <div class="product-thumb cookie-pack">OREO</div>
+            <div>
+              <h3>Oreo Original Cookies</h3>
+              <p>Contains: Milk, Soy</p>
+            </div>
+            <div class="scan-meta">
+              <span class="status-pill not-safe">Not Safe</span>
+              <small>2 mins ago</small>
+            </div>
+            <span class="row-arrow">&gt;</span>
+          </article>
+
+          <article class="scan-row card">
+            <div class="product-thumb chips-pack">LAY'S</div>
+            <div>
+              <h3>Lays American Style</h3>
+              <p class="safe-text">No Allergens Found</p>
+            </div>
+            <div class="scan-meta">
+              <span class="status-pill safe">Safe</span>
+              <small>1 hour ago</small>
+            </div>
+            <span class="row-arrow">&gt;</span>
+          </article>
+
+          <article class="scan-row card">
+            <div class="product-thumb shampoo-pack"></div>
+            <div>
+              <h3>Dove Intense Repair Shampoo</h3>
+              <p class="risk-text">May Contain: Tree Nuts</p>
+            </div>
+            <div class="scan-meta">
+              <span class="status-pill uncertain">Uncertain</span>
+              <small>Yesterday</small>
+            </div>
+            <span class="row-arrow">&gt;</span>
+          </article>
+        </div>
+      </section>
     </div>
-    <div class="flow-panel" aria-label="PicWise flow">
-      <div>
-        <strong>Upload</strong>
-        <span>Choose a label photo</span>
-      </div>
-      <div>
-        <strong>Analyze</strong>
-        <span>Run the API pipeline</span>
-      </div>
-      <div>
-        <strong>Understand</strong>
-        <span>Review matched knowledge-base fields</span>
-      </div>
+
+    <aside class="dashboard-side">
+      <section class="card panel-card">
+        <div class="section-title-row">
+          <h2>My Allergens</h2>
+          <a href="#">Edit</a>
+        </div>
+        <div class="allergen-list">
+          <span>Peanuts</span>
+          <span>Tree Nuts</span>
+          <span>Milk</span>
+          <span>Shellfish</span>
+          <span>Soy</span>
+        </div>
+        <div class="soft-note">
+          <span>HE</span>
+          <p>Stay safe by keeping your list updated.</p>
+        </div>
+      </section>
+
+      <section class="card panel-card">
+        <h2>Your Safety Insights</h2>
+        <div class="insight-list">
+          <div>
+            <span class="insight-icon blue">TS</span>
+            <p>Total Scans <strong>24</strong></p>
+            <span>&gt;</span>
+          </div>
+          <div>
+            <span class="insight-icon green">OK</span>
+            <p>Safe Products <strong>16 (67%)</strong></p>
+            <span>&gt;</span>
+          </div>
+          <div>
+            <span class="insight-icon amber">!</span>
+            <p>Potential Risks <strong>8 (33%)</strong></p>
+            <span>&gt;</span>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </section>
+
+  <section class="ai-tip">
+    <div class="bot-orb">AI</div>
+    <div>
+      <h2>PicWise AI Tip</h2>
+      <p>When in doubt, choose products with shorter ingredient lists. Less is often safer.</p>
     </div>
+    <div class="tip-light">TIP</div>
   </section>
 {% endblock %}

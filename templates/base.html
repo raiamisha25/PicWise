@@ -6,20 +6,72 @@
     <title>{% block title %}PicWise{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   </head>
-  <body>
-    <header class="site-header">
-      <a class="brand" href="/" aria-label="PicWise home">
-        <span class="brand-mark">PW</span>
-        <span>PicWise</span>
-      </a>
-      <nav>
-        <a href="/">Home</a>
-        <a href="/upload">Upload</a>
-      </nav>
-    </header>
+  <body class="{% block body_class %}app-shell{% endblock %}">
+    {% block shell %}
+      <aside class="sidebar">
+        <a class="brand" href="/" aria-label="PicWise home">
+          <span class="brand-shield">P</span>
+          <span>PicWise</span>
+        </a>
 
-    <main>
-      {% block content %}{% endblock %}
-    </main>
+        <nav class="side-nav" aria-label="Primary">
+          <a class="{{ 'active' if active_page == 'dashboard' else '' }}" href="/">
+            <span class="nav-icon">D</span>
+            Dashboard
+          </a>
+          <a class="{{ 'active' if active_page == 'scan' else '' }}" href="/upload">
+            <span class="nav-icon">S</span>
+            Scan Product
+          </a>
+          <a href="#">
+            <span class="nav-icon">H</span>
+            History
+          </a>
+          <a href="#">
+            <span class="nav-icon">A</span>
+            My Allergens
+          </a>
+          <a href="#">
+            <span class="nav-icon">I</span>
+            Insights
+          </a>
+          <a href="#">
+            <span class="nav-icon">G</span>
+            Settings
+          </a>
+        </nav>
+
+        <a class="support-link" href="#">
+          <span class="nav-icon">?</span>
+          Help & Support
+        </a>
+
+        <div class="safety-card">
+          <div class="safety-emblem">OK</div>
+          <strong>Your safety, our priority.</strong>
+          <span>PicWise helps you make safer choices, every day.</span>
+        </div>
+      </aside>
+
+      <div class="main-area">
+        <header class="topbar">
+          <div></div>
+          <div class="top-actions">
+            <button class="icon-button" type="button" aria-label="Notifications">
+              <span></span>
+            </button>
+            <a class="profile-chip" href="/login">
+              <span class="avatar">A</span>
+              <span>Hi, Amisha</span>
+              <span class="chevron">v</span>
+            </a>
+          </div>
+        </header>
+
+        <main class="content">
+          {% block content %}{% endblock %}
+        </main>
+      </div>
+    {% endblock %}
   </body>
 </html>

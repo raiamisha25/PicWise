@@ -12,10 +12,14 @@ def create_app():
 
     @app.get("/")
     def home():
-        return render_template("home.html")
+        return render_template("home.html", active_page="dashboard")
+
+    @app.get("/login")
+    def login():
+        return render_template("login.html", active_page="login")
 
     @app.get("/upload")
     def upload():
-        return render_template("upload.html")
+        return render_template("upload.html", active_page="scan")
 
     return app

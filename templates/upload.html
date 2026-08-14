@@ -1,18 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Upload Product | PicWise{% endblock %}
+{% block title %}Scan Product | PicWise{% endblock %}
 
 {% block content %}
-  <section class="workspace">
-    <div class="upload-panel">
-      <p class="eyebrow">Product scan</p>
-      <h1>Upload a Label Image</h1>
+  <section class="page-heading">
+    <h1>Scan <span>Product</span></h1>
+    <p>Upload a label image and review the knowledge-base matches.</p>
+  </section>
 
+  <section class="scan-page-grid">
+    <div class="upload-panel card">
       <form id="uploadForm" class="upload-form">
         <label id="dropZone" class="drop-zone" for="imageInput">
           <input id="imageInput" name="image" type="file" accept="image/jpeg,image/png,image/webp">
-          <span class="drop-title">Drop an image here or choose a file</span>
-          <span class="drop-subtitle">JPG, JPEG, PNG, and WEBP only</span>
+          <span class="drop-camera"><span class="camera-icon"></span></span>
+          <span class="drop-title">Drop a label image here</span>
+          <span class="drop-subtitle">JPG, JPEG, PNG, or WEBP</span>
         </label>
 
         <p id="fileError" class="inline-error" role="alert"></p>
@@ -22,62 +25,80 @@
           <button id="removeImage" class="secondary-action" type="button">Remove image</button>
         </div>
 
-        <button id="analyzeButton" class="primary-action" type="submit" disabled>Analyze</button>
+        <button id="analyzeButton" class="primary-action" type="submit" disabled>
+          <span class="button-icon camera-small"></span>
+          Analyze
+        </button>
       </form>
     </div>
 
-    <section id="loadingState" class="status-panel hidden" aria-live="polite">
-      <div class="spinner"></div>
-      <h2>Analyzing your product...</h2>
-      <p>PicWise is sending the label through the Phase 1 API pipeline.</p>
-    </section>
+    <aside class="card scan-helper">
+      <h2>Ready for Safer Choices</h2>
+      <p>PicWise checks the uploaded label against food, nutrition, and personal-care knowledge bases.</p>
+      <div class="helper-stat">
+        <span>Knowledge rows</span>
+        <strong>1,333</strong>
+      </div>
+      <div class="helper-stat">
+        <span>OCR status</span>
+        <strong>Stubbed</strong>
+      </div>
+    </aside>
+  </section>
 
-    <section id="resultsPanel" class="results-panel hidden" aria-live="polite">
-      <div class="results-heading">
-        <p class="eyebrow">Analysis results</p>
+  <section id="loadingState" class="status-panel card hidden" aria-live="polite">
+    <div class="spinner"></div>
+    <h2>Analyzing your product...</h2>
+    <p>PicWise is sending the label through the Phase 1 API pipeline.</p>
+  </section>
+
+  <section id="resultsPanel" class="results-panel card hidden" aria-live="polite">
+    <div class="section-title-row results-heading">
+      <div>
         <h2>Product Summary</h2>
+        <p>Missing fields are shown as Information not available.</p>
       </div>
+    </div>
 
-      <div class="summary-grid">
-        <div>
-          <span>Name</span>
-          <strong id="productName">Information not available</strong>
-        </div>
-        <div>
-          <span>Brand</span>
-          <strong id="productBrand">Information not available</strong>
-        </div>
-        <div>
-          <span>Domain</span>
-          <strong id="productDomain">Information not available</strong>
-        </div>
+    <div class="summary-grid">
+      <div>
+        <span>Name</span>
+        <strong id="productName">Information not available</strong>
       </div>
+      <div>
+        <span>Brand</span>
+        <strong id="productBrand">Information not available</strong>
+      </div>
+      <div>
+        <span>Domain</span>
+        <strong id="productDomain">Information not available</strong>
+      </div>
+    </div>
 
-      <div class="result-section">
-        <h3>Ingredients</h3>
-        <div id="ingredientsList" class="result-list"></div>
-      </div>
+    <div class="result-section">
+      <h3>Ingredients</h3>
+      <div id="ingredientsList" class="result-list"></div>
+    </div>
 
-      <div class="result-section">
-        <h3>Food Details</h3>
-        <div id="foodDetails" class="result-list"></div>
-      </div>
+    <div class="result-section">
+      <h3>Food Details</h3>
+      <div id="foodDetails" class="result-list"></div>
+    </div>
 
-      <div class="result-section">
-        <h3>Nutrition</h3>
-        <div id="nutritionList" class="result-list"></div>
-      </div>
+    <div class="result-section">
+      <h3>Nutrition</h3>
+      <div id="nutritionList" class="result-list"></div>
+    </div>
 
-      <div class="result-section">
-        <h3>Personal Care Details</h3>
-        <div id="personalCareList" class="result-list"></div>
-      </div>
+    <div class="result-section">
+      <h3>Personal Care Details</h3>
+      <div id="personalCareList" class="result-list"></div>
+    </div>
 
-      <div class="result-section">
-        <h3>Warnings</h3>
-        <div id="warningsList" class="result-list"></div>
-      </div>
-    </section>
+    <div class="result-section">
+      <h3>Warnings</h3>
+      <div id="warningsList" class="result-list"></div>
+    </div>
   </section>
 
   <script src="{{ url_for('static', filename='app.js') }}"></script>

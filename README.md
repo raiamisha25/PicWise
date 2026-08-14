@@ -68,6 +68,12 @@ python app.py
 
 Open `http://127.0.0.1:5000`.
 
+Useful local pages:
+
+- `http://127.0.0.1:5000/` - dashboard-style home page
+- `http://127.0.0.1:5000/upload` - product scan/upload flow
+- `http://127.0.0.1:5000/login` - Phase 1 login UI placeholder
+
 ## API
 
 `POST /api/analyze`
@@ -103,6 +109,7 @@ Stubbed:
 
 - OCR in `backend/services/ocr_service/stub.py`. It currently returns placeholder
   extracted text so the rest of the pipeline can be exercised end to end.
+- Login page UI. It is a visual placeholder only; no account system is active.
 
 Real:
 
