@@ -10,35 +10,35 @@ database server, payments, or deployment infrastructure.
 
 ## Tech Choice
 
-This project uses Flask for both the website and the REST API because you wanted
-the project entirely in the Flask framework. Flask keeps the Phase 1 app compact:
-Jinja templates render the pages, static JavaScript handles upload interactions,
-and Python service modules own the backend pipeline.
+This project uses Flask for both the website and the REST API because the project
+is intended to stay entirely within the Flask framework. Flask keeps the Phase 1
+app compact: Jinja templates render the pages, static JavaScript handles upload
+interactions, and Python service modules own the backend pipeline.
 
 ## Project Structure
 
 ```text
 PicWise/
-├── app.py
-├── backend/
-│   ├── routes/
-│   ├── services/
-│   │   ├── ocr_service/
-│   │   ├── ingredient_matching/
-│   │   ├── nutrition_service/
-│   │   └── analysis_service/
-│   └── ml/
-│       ├── preprocessing/
-│       ├── training/
-│       ├── inference/
-│       └── models/
-├── data/
-│   ├── food/
-│   ├── nutrition/
-│   └── personal_care/
-├── templates/
-├── static/
-└── README.md
+|-- app.py
+|-- backend/
+|   |-- routes/
+|   |-- services/
+|   |   |-- ocr_service/
+|   |   |-- ingredient_matching/
+|   |   |-- nutrition_service/
+|   |   `-- analysis_service/
+|   `-- ml/
+|       |-- preprocessing/
+|       |-- training/
+|       |-- inference/
+|       `-- models/
+|-- data/
+|   |-- food/
+|   |-- nutrition/
+|   `-- personal_care/
+|-- templates/
+|-- static/
+`-- README.md
 ```
 
 ## Knowledge Base Files
