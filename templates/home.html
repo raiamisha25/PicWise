@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}PicWise | Product Label Analysis{% endblock %}
+
+{% block content %}
+  <section class="hero">
+    <div class="hero-content">
+      <p class="eyebrow">AI-assisted product scanning</p>
+      <h1>PicWise</h1>
+      <p>
+        Upload a food or personal-care product label and PicWise will prepare it
+        for ingredient, nutrition, and safety lookup. Phase 1 uses a stubbed OCR
+        step while the website, API, and knowledge-base flow are wired end to end.
+      </p>
+      <a class="primary-action" href="/upload">Upload Product</a>
+    </div>
+    <div class="flow-panel" aria-label="PicWise flow">
+      <div>
+        <strong>Upload</strong>
+        <span>Choose a label photo</span>
+      </div>
+      <div>
+        <strong>Analyze</strong>
+        <span>Run the API pipeline</span>
+      </div>
+      <div>
+        <strong>Understand</strong>
+        <span>Review matched knowledge-base fields</span>
+      </div>
+    </div>
+  </section>
+{% endblock %}

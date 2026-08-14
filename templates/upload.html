@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Product | PicWise{% endblock %}
+
+{% block content %}
+  <section class="workspace">
+    <div class="upload-panel">
+      <p class="eyebrow">Product scan</p>
+      <h1>Upload a Label Image</h1>
+
+      <form id="uploadForm" class="upload-form">
+        <label id="dropZone" class="drop-zone" for="imageInput">
+          <input id="imageInput" name="image" type="file" accept="image/jpeg,image/png,image/webp">
+          <span class="drop-title">Drop an image here or choose a file</span>
+          <span class="drop-subtitle">JPG, JPEG, PNG, and WEBP only</span>
+        </label>
+
+        <p id="fileError" class="inline-error" role="alert"></p>
+
+        <div id="previewWrap" class="preview-wrap hidden">
+          <img id="previewImage" alt="Selected product label preview">
+          <button id="removeImage" class="secondary-action" type="button">Remove image</button>
+        </div>
+
+        <button id="analyzeButton" class="primary-action" type="submit" disabled>Analyze</button>
+      </form>
+    </div>
+
+    <section id="loadingState" class="status-panel hidden" aria-live="polite">
+      <div class="spinner"></div>
+      <h2>Analyzing your product...</h2>
+      <p>PicWise is sending the label through the Phase 1 API pipeline.</p>
+    </section>
+
+    <section id="resultsPanel" class="results-panel hidden" aria-live="polite">
+      <div class="results-heading">
+        <p class="eyebrow">Analysis results</p>
+        <h2>Product Summary</h2>
+      </div>
+
+      <div class="summary-grid">
+        <div>
+          <span>Name</span>
+          <strong id="productName">Information not available</strong>
+        </div>
+        <div>
+          <span>Brand</span>
+          <strong id="productBrand">Information not available</strong>
+        </div>
+        <div>
+          <span>Domain</span>
+          <strong id="productDomain">Information not available</strong>
+        </div>
+      </div>
+
+      <div class="result-section">
+        <h3>Ingredients</h3>
+        <div id="ingredientsList" class="result-list"></div>
+      </div>
+
+      <div class="result-section">
+        <h3>Food Details</h3>
+        <div id="foodDetails" class="result-list"></div>
+      </div>
+
+      <div class="result-section">
+        <h3>Nutrition</h3>
+        <div id="nutritionList" class="result-list"></div>
+      </div>
+
+      <div class="result-section">
+        <h3>Personal Care Details</h3>
+        <div id="personalCareList" class="result-list"></div>
+      </div>
+
+      <div class="result-section">
+        <h3>Warnings</h3>
+        <div id="warningsList" class="result-list"></div>
+      </div>
+    </section>
+  </section>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}
