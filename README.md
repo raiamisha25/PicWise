@@ -127,3 +127,42 @@ Real:
   touching the route or analysis service.
 - Swap data files by changing env vars.
 - Add later ML code under `backend/ml/` without restructuring the API.
+
+## ML Training (Phase 2)
+
+PicWise includes a multi-class XGBoost text classification pipeline under `backend/ml/` for predicting `Safety Level` and `Allergy Risk` from ingredient names using character n-gram TF-IDF features.
+
+### How to Run Training
+
+Run the training pipeline from the root directory:
+
+```powershell
+python -m backend.ml.training.train
+```
+
+The pipeline automatically:
+1. Loads food and personal-care datasets (configured via `FOOD_DATA_PATH` and `PERSONAL_CARE_DATA_PATH`).
+2. Normalizes safety level labels (`Very Safe`, `Safe`, `Moderate Risk`, `High Risk`) and maps missing/blank allergy risk values to `"None"`.
+3. Engineers character TF-IDF n-gram features (including alternate and packaging names).
+4. Trains two multi-class XGBoost models for Safety Level and Allergy Risk.
+5. Saves fitted artifacts to `backend/ml/models/`.
+
+### Model Artifacts
+
+Artifacts are saved in `backend/ml/models/`:
+- `vectorizer.joblib`: Fitted character n-gram `TfidfVectorizer`
+- `safety_model.joblib`: Trained XGBoost Safety Level classifier
+- `allergy_model.joblib`: Trained XGBoost Allergy Risk classifier
+- `safety_label_encoder.joblib`: LabelEncoder for Safety Level
+- `allergy_label_encoder.joblib`: LabelEncoder for Allergy Risk
+
+### Inference Usage
+
+Import `predict_ingredient_risk` in service modules:
+
+```python
+from backend.ml.inference.predictor import predict_ingredient_risk
+
+result = predict_ingredient_risk("Sodium Lauryl Sulfate")
+# Returns: {"safetyLevel": "Moderate Risk", "allergyRisk": "Low", "confidence": 0.88}
+```

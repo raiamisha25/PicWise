@@ -23,10 +23,10 @@ def analyze_product_image(image_bytes, knowledge_base):
 
 
 def _detect_domain(ingredients):
-    food_count = sum(1 for item in ingredients if item["domain"] == "food")
-    personal_care_count = sum(
-        1 for item in ingredients if item["domain"] == "personal_care"
-    )
+    matched_items = [item for item in ingredients if item.get("matched")]
+    food_count = sum(1 for item in matched_items if item["domain"] == "food")
+    personal_care_count = sum(1 for item in matched_items if item["domain"] == "personal_care")
+
     if food_count > personal_care_count:
         return "food"
     if personal_care_count > food_count:
@@ -38,9 +38,19 @@ def _personal_care_results(ingredients):
     return [
         {
             "ingredient": item["name"],
-            "function": item["function"],
-            "safetyLevel": item["safetyLevel"],
-            "irritationRisk": item["irritationRisk"],
+            "canonicalName": item.get("canonicalName") or item["name"],
+            "originalInput": item.get("originalInput") or item["name"],
+            "matchType": item.get("matchType"),
+            "confidence": item.get("confidence"),
+            "function": item.get("function") or item.get("primaryFunction"),
+            "primaryFunction": item.get("primaryFunction"),
+            "ingredientCategory": item.get("ingredientCategory"),
+            "productCategories": item.get("productCategories"),
+            "origin": item.get("origin"),
+            "safetyLevel": item.get("safetyLevel"),
+            "allergyRisk": item.get("allergyRisk"),
+            "irritationRisk": item.get("irritationRisk"),
+            "regulatoryStatus": item.get("regulatoryStatus"),
         }
         for item in ingredients
         if item["domain"] == "personal_care"
@@ -49,5 +59,5 @@ def _personal_care_results(ingredients):
 
 def _warnings(knowledge_base):
     warnings = list(knowledge_base.warnings)
-    warnings.append("OCR is stubbed for Phase 1; results use placeholder extracted text.")
+    warnings.append("OCR is stubbed; results use placeholder extracted text.")
     return warnings
