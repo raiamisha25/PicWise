@@ -49,8 +49,16 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
+  const categoryInput = form.querySelector("input[name='category']:checked");
+  const selectedCategory = categoryInput ? categoryInput.value : "";
+  if (!selectedCategory) {
+    fileError.textContent = "Please select a product category (Food or Personal Care).";
+    return;
+  }
+
   const formData = new FormData();
   formData.append("image", selectedFile);
+  formData.append("category", selectedCategory);
 
   loadingState.classList.remove("hidden");
   resultsPanel.classList.add("hidden");
@@ -107,7 +115,44 @@ function renderResults(data) {
 
   renderList("#ingredientsList", data.ingredients, renderIngredient);
   renderList("#foodDetails", foodItems(data.ingredients), renderFoodDetail);
-  renderList("#nutritionList", data.nutrition, renderNutrition);
+
+  const isPersonalCare = data.product?.domain === "personal_care";
+  const nutritionContainer = document.querySelector("#nutritionList");
+  nutritionContainer.innerHTML = "";
+
+  if (isPersonalCare) {
+    const naItem = resultItem("Nutrition Facts", [
+      ["Status", "Not applicable for personal care products."]
+    ]);
+    nutritionContainer.appendChild(naItem);
+  } else {
+    let nutritionItems = [];
+    if (data.nutrition && typeof data.nutrition === "object" && !Array.isArray(data.nutrition)) {
+      nutritionItems = Object.entries(data.nutrition).map(([key, val]) => {
+        let valStr = unavailable;
+        let per100gStr = null;
+        if (val && typeof val === "object") {
+          if (val.value !== undefined) {
+            valStr = `${val.value} ${val.unit || ""}`.trim();
+          }
+          if (val.per_100g && val.per_100g.value !== undefined) {
+            per100gStr = `${val.per_100g.value} ${val.per_100g.unit || ""}`.trim();
+          }
+        } else if (val !== undefined && val !== null) {
+          valStr = String(val);
+        }
+        return {
+          nutrient: formatNutrientName(key),
+          value: valStr,
+          per100g: per100gStr,
+        };
+      });
+    } else if (Array.isArray(data.nutrition)) {
+      nutritionItems = data.nutrition;
+    }
+    renderList("#nutritionList", nutritionItems, renderNutrition);
+  }
+
   renderList("#personalCareList", data.personalCare, renderPersonalCare);
   renderList("#warningsList", data.warnings, renderWarning);
 }
@@ -149,13 +194,32 @@ function renderFoodDetail(item) {
 }
 
 function renderNutrition(item) {
+  const pairs = [];
+  if (item.value !== undefined) {
+    pairs.push(["Amount", item.value]);
+  }
+  if (item.per100g) {
+    pairs.push(["Per 100g", item.per100g]);
+  }
+  if (item.role) {
+    pairs.push(["Role", item.role]);
+  }
+  if (item.healthImpact) {
+    pairs.push(["Health impact", item.healthImpact]);
+  }
+  if (pairs.length === 0) {
+    pairs.push(["Amount", unavailable]);
+  }
   return resultItem(
-    valueOrUnavailable(item.nutrient),
-    [
-      ["Role", item.role],
-      ["Health impact", item.healthImpact],
-    ],
+    valueOrUnavailable(item.nutrient || item.name),
+    pairs
   );
+}
+
+function formatNutrientName(key) {
+  return String(key)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function renderPersonalCare(item) {

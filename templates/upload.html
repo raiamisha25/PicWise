@@ -11,6 +11,32 @@
   <section class="scan-page-grid">
     <div class="upload-panel card">
       <form id="uploadForm" class="upload-form">
+        <div class="category-selection-group">
+          <span class="category-group-label">Select Product Category <span class="required-star">*</span></span>
+          <div class="category-toggle-container">
+            <label class="category-card" for="catFood">
+              <input type="radio" id="catFood" name="category" value="food" checked>
+              <div class="category-card-inner">
+                <span class="category-icon">🍏</span>
+                <div class="category-info">
+                  <strong class="category-title">Food & Beverages</strong>
+                  <span class="category-desc">Ingredients & nutrition facts</span>
+                </div>
+              </div>
+            </label>
+            <label class="category-card" for="catPersonalCare">
+              <input type="radio" id="catPersonalCare" name="category" value="personal_care">
+              <div class="category-card-inner">
+                <span class="category-icon">🧴</span>
+                <div class="category-info">
+                  <strong class="category-title">Personal Care</strong>
+                  <span class="category-desc">Cosmetics & skin safety</span>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
         <label id="dropZone" class="drop-zone" for="imageInput">
           <input id="imageInput" name="image" type="file" accept="image/jpeg,image/png,image/webp">
           <span class="drop-camera"><span class="camera-icon"></span></span>
@@ -37,11 +63,11 @@
       <p>PicWise checks the uploaded label against food, nutrition, and personal-care knowledge bases.</p>
       <div class="helper-stat">
         <span>Knowledge rows</span>
-        <strong>1,333</strong>
+        <strong>1,333+</strong>
       </div>
       <div class="helper-stat">
         <span>OCR status</span>
-        <strong>Stubbed</strong>
+        <strong>Integrated (PaddleOCR)</strong>
       </div>
     </aside>
   </section>

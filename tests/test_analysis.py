@@ -38,7 +38,7 @@ class TestAnalysisService(unittest.TestCase):
         with open(fixture_path, "rb") as f:
             response = self.client.post(
                 "/api/analyze",
-                data={"image": (f, "test_product.jpg")},
+                data={"image": (f, "test_product.jpg"), "category": "food"},
                 content_type="multipart/form-data"
             )
 
