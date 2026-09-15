@@ -1,9 +1,13 @@
+from backend.ml.inference.food_safety_service import predict_food_safety
 from backend.services.ocr_service import run_ocr
 
 
 def analyze_product_image(image_bytes, knowledge_base=None, category="food"):
     """
     Analyzes a product image using the integrated OCR service and user-selected category.
+    Downstream of OCR, if category == 'food', executes production Food Safety inference
+    (Character TF-IDF + MiniLM-L6-v2 + Balanced Logistic Regression) for each ingredient.
+    If category == 'personal_care', Food Safety inference is strictly skipped.
 
     Parameters:
         image_bytes (bytes): Raw bytes of the uploaded image.
@@ -38,13 +42,20 @@ def analyze_product_image(image_bytes, knowledge_base=None, category="food"):
         }
 
         if category == "food":
-            entry["safetyLevel"] = meta.get("Safety Level")
+            # Execute production Food Safety ML inference downstream of OCR
+            score_target = item.get("matched_name") or item.get("raw_text") or name
+            food_safety_result = predict_food_safety(score_target)
+
+            entry["foodSafety"] = food_safety_result
+            entry["safetyLevel"] = food_safety_result.get("risk_class") or meta.get("Safety Level")
             entry["allergyRisk"] = meta.get("Allergy Risk")
             entry["healthImpact"] = meta.get("Health Impact")
             entry["processingLevel"] = meta.get("Processing Level")
             entry["regulatoryStatus"] = meta.get("Regulatory Status")
             entry["category"] = meta.get("Category")
         else:
+            # Personal care: strictly NO Food Safety inference
+            entry["foodSafety"] = None
             entry["safetyLevel"] = meta.get("Safety_Level")
             entry["allergyRisk"] = meta.get("Allergy_Risk")
             entry["irritationRisk"] = meta.get("Irritation_Risk")
@@ -103,7 +114,7 @@ def _build_personal_care_results(ingredients):
             "allergyRisk": item.get("allergyRisk"),
             "irritationRisk": item.get("irritationRisk"),
             "regulatoryStatus": item.get("regulatoryStatus"),
+            "metadata": item.get("metadata", {}),
         }
         for item in ingredients
     ]
-

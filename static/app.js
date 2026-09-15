@@ -170,14 +170,18 @@ function renderList(selector, items, renderer) {
 }
 
 function renderIngredient(item) {
+  const pairs = [
+    ["Matched", item.matched ? "Yes" : "No"],
+    ["Confidence", Number.isFinite(item.confidence) ? item.confidence.toFixed(2) : unavailable],
+    ["Safety level", item.safetyLevel],
+    ["Allergy risk", item.allergyRisk],
+  ];
+  if (item.foodSafety && Number.isFinite(item.foodSafety.confidence)) {
+    pairs.push(["Safety confidence", (item.foodSafety.confidence * 100).toFixed(1) + "%"]);
+  }
   return resultItem(
     valueOrUnavailable(item.name),
-    [
-      ["Matched", item.matched ? "Yes" : "No"],
-      ["Confidence", Number.isFinite(item.confidence) ? item.confidence.toFixed(2) : unavailable],
-      ["Safety level", item.safetyLevel],
-      ["Allergy risk", item.allergyRisk],
-    ],
+    pairs,
   );
 }
 

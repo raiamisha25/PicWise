@@ -21,6 +21,9 @@
       "__init__.py": "789ff2777d138e24fde524db4f01cedd4f601af3776ff13438a754c8aa93f5cf",
       "allergy_label_encoder.joblib": "913de25e43e73090f67399fa5f0ce6aa20e19be0a13ce619d4107c3389303e8e",
       "allergy_model.joblib": "07282b13d597266b72dafd7305f1a526c33448799a0072458578a0ebdb82400b",
+      "food_safety/classifier.joblib": "58fc0ee797c88c99bd92eafea1ea350153b4829a4137388160ee0ef7af1489e1",
+      "food_safety/model_metadata.json": "8d6ac5051e5b22add2c05a7da4ca7b67bb0b3fe3969b2c4f4097d49283a12bf6",
+      "food_safety/vectorizer.joblib": "746283097ecef519a250ad73c6654798be4a4a185e5d3701a1a99db4cf48e0f2",
       "safety_label_encoder.joblib": "13895353ba6a3e2f49507994c55aefa9c6e527c0127bc467e60274c13008d5b7",
       "safety_model.joblib": "2775ca799f686b4eeb407e56e953415758fc9f8e0c75a53f999c0e0e27ffd2a4",
       "vectorizer.joblib": "d17c60f67c7336d6bc640f53eb7e01243324b75148bfa570a9b21bdb6dc5d82b"
