@@ -3,8 +3,44 @@ from flask import Blueprint, current_app, jsonify, request
 from PIL import Image
 
 from backend.services.analysis_service import analyze_product_image
+from backend.services.food_analysis_service import analyze_food
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+
+
+@api_bp.post("/food/analyze")
+def analyze_food_endpoint():
+    category = request.form.get("category")
+    if not category or not category.strip():
+        return jsonify({"error": "Product category is required in form field 'category'."}), 400
+
+    category = category.strip().lower()
+    if category != "food":
+        return jsonify({
+            "error": f"Invalid category '{category}'. This endpoint strictly handles 'food' analysis."
+        }), 400
+
+    image = request.files.get("image")
+    if image is None or image.filename == "":
+        return jsonify({"error": "Image file is required in form field 'image'."}), 400
+
+    if not _is_allowed_image(image.mimetype, image.filename):
+        return jsonify({"error": "Only JPG, JPEG, PNG, and WEBP images are supported."}), 400
+
+    image_bytes = image.read()
+    if not image_bytes or len(image_bytes) == 0:
+        return jsonify({"error": "Uploaded image file is empty."}), 400
+
+    try:
+        pil_img = Image.open(io.BytesIO(image_bytes))
+        pil_img.verify()
+    except Exception:
+        return jsonify({"error": "Invalid or corrupt image file."}), 400
+
+    knowledge_base = current_app.config.get("KNOWLEDGE_BASE")
+    result = analyze_food(image_bytes, category=category, knowledge_base=knowledge_base)
+    return jsonify(result.to_dict()), 200
+
 
 
 @api_bp.post("/analyze")
