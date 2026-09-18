@@ -6,6 +6,7 @@ Coordinates OCR, Food Safety ML inference, Nutrition Scoring Engine,
 and Allergy analysis into a deterministic, unified pipeline.
 """
 
+import logging
 from typing import Optional, Any, Dict, List
 
 from backend.ml.inference.food_safety_service import predict_food_safety
@@ -29,6 +30,8 @@ from backend.services.food_status_service import (
     map_nutrition_status,
     map_food_analysis_presentation,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def analyze_food(
@@ -68,7 +71,10 @@ def analyze_food(
         ocr_kb = knowledge_base if (knowledge_base and hasattr(knowledge_base, "get_ingredient_names")) else None
         ocr_output = run_ocr(image_bytes, category="food", kb=ocr_kb)
     except Exception as exc:
+        err_msg = f"OCR processing failed: {str(exc)}"
+        logger.error(err_msg, exc_info=True)
         # On OCR failure, downstream models are NOT called with fabricated data
+        # Presentation mapping is explicitly unavailable across all dimensions
         return FoodAnalysisResult(
             category="food",
             success=False,
@@ -76,8 +82,9 @@ def analyze_food(
             food_safety=None,
             nutrition=None,
             allergy=None,
-            errors=[f"OCR processing failed: {str(exc)}"],
+            errors=[err_msg],
             warnings=[],
+            presentation=map_food_analysis_presentation(None, None, None).to_dict(),
         )
 
     all_warnings: List[str] = []
@@ -137,6 +144,7 @@ def analyze_food(
         except Exception as exc:
             # Component isolation: food safety failure does not crash the entire food analysis
             err_msg = f"Food safety inference encountered an error: {str(exc)}"
+            logger.error(err_msg, exc_info=True)
             all_warnings.append(err_msg)
             food_safety_dict = FoodSafetyResult(
                 status="error",
@@ -175,6 +183,7 @@ def analyze_food(
     except Exception as exc:
         # Component isolation: nutrition error does not crash other components
         nut_err_msg = f"Nutrition scoring engine encountered an error: {str(exc)}"
+        logger.error(nut_err_msg, exc_info=True)
         all_warnings.append(nut_err_msg)
         nutrition_dict = {
             "nutrition_score": None,
@@ -210,6 +219,7 @@ def analyze_food(
     except Exception as exc:
         # Component isolation: allergy lookup error does not crash the entire food analysis
         all_err_msg = f"Allergy risk lookup encountered an error: {str(exc)}"
+        logger.error(all_err_msg, exc_info=True)
         all_warnings.append(all_err_msg)
         allergy_dict = AllergyResult(
             status="error",
@@ -231,13 +241,31 @@ def analyze_food(
         allergy_dict["ui_label"] = allergy_dict.get("product_ui_label")
 
     # 7. Presentation Status Mapping across independent dimensions (Phase 9H)
-    presentation_obj = map_food_analysis_presentation(
-        food_safety=food_safety_dict,
-        allergy=allergy_dict,
-        nutrition=nutrition_dict,
-    )
+    presentation_dict: Optional[Dict[str, Any]] = None
+    try:
+        presentation_obj = map_food_analysis_presentation(
+            food_safety=food_safety_dict,
+            allergy=allergy_dict,
+            nutrition=nutrition_dict,
+        )
+        presentation_dict = presentation_obj.to_dict()
+    except Exception as exc:
+        pres_err_msg = f"Presentation status mapping failed: {str(exc)}"
+        logger.error(pres_err_msg, exc_info=True)
+        all_warnings.append(pres_err_msg)
+        presentation_dict = {
+            "food_safety": {"status": "unavailable"},
+            "allergy": {"status": "unavailable"},
+            "nutrition": {"status": "unavailable"},
+        }
 
     # 8. Assemble Unified Result
+    logger.info(
+        "Food analysis completed. Ingredients: %d, Allergy status: %s, Nutrition score: %s",
+        len(raw_ingredients),
+        allergy_dict.get("presentation_status"),
+        str(nutrition_dict.get("nutrition_score")),
+    )
     return FoodAnalysisResult(
         category="food",
         success=True,
@@ -247,5 +275,5 @@ def analyze_food(
         allergy=allergy_dict,
         errors=[],
         warnings=all_warnings,
-        presentation=presentation_obj.to_dict(),
+        presentation=presentation_dict,
     )

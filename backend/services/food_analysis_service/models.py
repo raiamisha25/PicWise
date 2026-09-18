@@ -42,6 +42,70 @@ from backend.services.allergy_service.models import (
 )
 
 
+def _sanitize_for_serialization(obj: Any) -> Any:
+    """
+    Recursively sanitizes values for JSON serialization without mutating
+    any semantic values.
+
+    Strict value preservation guarantees:
+      - None remains None (never coerced to 0, false, or empty string)
+      - 0 remains 0 (integer type preserved)
+      - 0.0 remains 0.0 (float type preserved)
+      - False / True remain bool
+    """
+    if obj is None:
+        return None
+
+    # Check bool before int because bool inherits from int in Python
+    if isinstance(obj, bool):
+        return obj
+    if isinstance(obj, int):
+        return obj
+    if isinstance(obj, float):
+        return obj
+    if isinstance(obj, str):
+        return obj
+
+    # Handle NumPy scalar and array types if present
+    try:
+        import numpy as np
+        if isinstance(obj, (np.bool_,)):
+            return bool(obj)
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            return float(obj)
+        if isinstance(obj, (np.ndarray,)):
+            return [_sanitize_for_serialization(item) for item in obj.tolist()]
+    except ImportError:
+        pass
+
+    # Handle dataclasses
+    if hasattr(obj, "__dataclass_fields__"):
+        return _sanitize_for_serialization(asdict(obj))
+
+    # Handle objects with to_dict()
+    if hasattr(obj, "to_dict") and callable(obj.to_dict):
+        return _sanitize_for_serialization(obj.to_dict())
+
+    # Handle Enums
+    if hasattr(obj, "value") and hasattr(obj, "name"):
+        return _sanitize_for_serialization(obj.value)
+
+    # Handle dictionaries
+    if isinstance(obj, dict):
+        return {str(k): _sanitize_for_serialization(v) for k, v in obj.items()}
+
+    # Handle sequences
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_for_serialization(item) for item in obj]
+    if isinstance(obj, set):
+        return [_sanitize_for_serialization(item) for item in sorted(obj, key=lambda x: str(x))]
+
+    # Fallback for Path or other printable objects
+    return str(obj)
+
+
 @dataclass
 class FoodAnalysisResult:
     """
@@ -87,4 +151,5 @@ class FoodAnalysisResult:
         }
         if pres_val is not None:
             d["presentation"] = pres_val
-        return d
+
+        return _sanitize_for_serialization(d)
