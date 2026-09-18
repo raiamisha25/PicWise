@@ -186,11 +186,12 @@ class TestFoodAnalysisPipeline(unittest.TestCase):
             self.assertIn("guardrails", nut)
             self.assertIn("nutrients_evaluated", nut)
 
-            # Check Allergy component (explicitly Unavailable)
+            # Check Allergy component (deterministic KB lookup)
             al = res_dict["allergy"]
-            self.assertEqual(al["status"], "Unavailable")
-            self.assertEqual(al["allergens_detected"], [])
-            self.assertIn("not yet implemented", al["details"])
+            self.assertEqual(al["status"], "success")
+            self.assertEqual(al["product_risk_level"], "Medium")
+            self.assertEqual(al["product_ui_label"], "Moderate Allergy Risk")
+            self.assertEqual(al["allergens_detected"], ["Refined Wheat Flour (Maida)"])
 
     # ----------------------------------------------------------------------
     # 4. Nutrition Insufficient Data Handling
@@ -242,10 +243,10 @@ class TestFoodAnalysisPipeline(unittest.TestCase):
             self.assertIn("No ingredients detected", fs["warnings"][0])
 
     # ----------------------------------------------------------------------
-    # 6. Allergy Component Independence and Non-fabrication
+    # 6. Allergy Component Deterministic Lookup
     # ----------------------------------------------------------------------
-    def test_allergy_component_is_unavailable_and_not_fabricated(self):
-        """Allergy engine must report status='Unavailable' and never produce fabricated predictions."""
+    def test_allergy_component_deterministic_lookup(self):
+        """Allergy engine deterministically looks up ingredients in knowledge base."""
         dummy_bytes = _create_dummy_image_bytes()
         mocked_ocr_output = {
             "domain": "food",
@@ -257,9 +258,10 @@ class TestFoodAnalysisPipeline(unittest.TestCase):
         with patch("backend.services.food_analysis_service.analyzer.run_ocr", return_value=mocked_ocr_output):
             result = analyze_food(dummy_bytes, category="food")
             al = result.allergy
-            self.assertEqual(al["status"], "Unavailable")
-            self.assertEqual(al["allergens_detected"], [])
-            self.assertIn("not yet implemented or production-ready", al["details"])
+            self.assertEqual(al["status"], "success")
+            self.assertEqual(al["product_risk_level"], "High")
+            self.assertEqual(al["product_ui_label"], "High Allergy Risk")
+            self.assertEqual(al["allergens_detected"], ["Peanuts"])
 
     # ----------------------------------------------------------------------
     # 7. Partial Failure Resilience
@@ -415,8 +417,11 @@ class TestFoodAnalysisPipeline(unittest.TestCase):
         self.assertIsNotNone(result.nutrition)
         self.assertIn(result.nutrition["status"], ["scored", "Insufficient Nutrition Data"])
 
-        # Allergy is explicitly marked Unavailable
-        self.assertEqual(result.allergy["status"], "Unavailable")
+        # Allergy component resolves active lookup
+        self.assertIsNotNone(result.allergy)
+        self.assertEqual(result.allergy["status"], "success")
+        self.assertEqual(result.allergy["product_risk_level"], "No Risk")
+        self.assertEqual(result.allergy["product_ui_label"], "Allergen-Free")
 
     # ----------------------------------------------------------------------
     # 11. Dedicated API Endpoint Tests (/api/food/analyze)
@@ -438,7 +443,9 @@ class TestFoodAnalysisPipeline(unittest.TestCase):
         self.assertIn("food_safety", data)
         self.assertIn("nutrition", data)
         self.assertIn("allergy", data)
-        self.assertEqual(data["allergy"]["status"], "Unavailable")
+        self.assertEqual(data["allergy"]["status"], "success")
+        self.assertEqual(data["allergy"]["product_risk_level"], "No Risk")
+        self.assertEqual(data["allergy"]["product_ui_label"], "Allergen-Free")
 
     def test_api_food_analyze_category_enforcement(self):
         """POST /api/food/analyze strictly requires category='food'."""

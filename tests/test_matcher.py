@@ -94,7 +94,7 @@ class TestIngredientMatcher(unittest.TestCase):
 
         self.assertEqual(len(matches), 1)
         match_item = matches[0]
-        self.assertEqual(match_item["allergyRisk"], "None")
+        self.assertIn(match_item["allergyRisk"], ("No Risk", "None"))
         self.assertIsNotNone(match_item["allergyRisk"])
 
     def test_complete_source_preservation(self):

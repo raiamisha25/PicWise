@@ -22,6 +22,7 @@ from backend.services.food_analysis_service.models import (
 )
 from backend.services.nutrition_service import calculate_nutrition_score
 from backend.services.ocr_service import run_ocr
+from backend.services.allergy_service import calculate_allergy_risk
 
 
 def analyze_food(
@@ -164,15 +165,26 @@ def analyze_food(
             "error": str(exc),
         }
 
-    # 6. Allergy Pipeline State
-    # Explicit status: no production-certified allergy engine is deployed in this phase.
-    allergy_dict = AllergyResult(
-        status="Unavailable",
-        allergens_detected=[],
-        details="Allergy analysis engine is not yet implemented or production-ready in this phase.",
-        warnings=["Allergy detection service is currently unavailable."],
-    ).to_dict()
-    all_warnings.extend(allergy_dict["warnings"])
+    # 6. Allergy Pipeline Execution (Deterministic Knowledge Base Lookup)
+    allergy_dict: Dict[str, Any]
+    try:
+        allergy_res = calculate_allergy_risk(
+            ingredients=raw_ingredients,
+            category="food",
+            knowledge_base=knowledge_base,
+        )
+        allergy_dict = allergy_res.to_dict() if hasattr(allergy_res, "to_dict") else allergy_res
+        if allergy_dict.get("warnings"):
+            all_warnings.extend(allergy_dict["warnings"])
+    except Exception as exc:
+        # Component isolation: allergy lookup error does not crash the entire food analysis
+        all_err_msg = f"Allergy risk lookup encountered an error: {str(exc)}"
+        all_warnings.append(all_err_msg)
+        allergy_dict = AllergyResult(
+            status="error",
+            warnings=[all_err_msg],
+            error=str(exc),
+        ).to_dict()
 
     # 7. Assemble Unified Result
     return FoodAnalysisResult(

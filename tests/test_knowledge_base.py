@@ -25,11 +25,11 @@ class TestKnowledgeBase(unittest.TestCase):
         self.assertGreater(len(self.kb.nutrition), 0, "Nutrition dataset should contain records")
 
     def test_semantic_none_preservation(self):
-        # Find a record with explicit Allergy Risk = "None"
-        food_none_rows = [r for r in self.kb.food if r.get("Allergy Risk") == "None"]
-        self.assertGreater(len(food_none_rows), 0, "Food dataset contains records with explicit Allergy Risk = 'None'")
-        sample_row = food_none_rows[0]
-        self.assertEqual(sample_row.get("Allergy Risk"), "None")
+        # Find a record with explicit Allergy Risk ("No Risk" or legacy "None")
+        food_explicit_rows = [r for r in self.kb.food if r.get("Allergy Risk") in ("No Risk", "None")]
+        self.assertGreater(len(food_explicit_rows), 0, "Food dataset contains records with explicit Allergy Risk")
+        sample_row = food_explicit_rows[0]
+        self.assertIn(sample_row.get("Allergy Risk"), ("No Risk", "None"))
 
     def test_actual_missing_value_distinguishment(self):
         # Check that empty cells in Personal Care dataset produce Python None, not empty string or "None"
@@ -47,7 +47,21 @@ class TestKnowledgeBase(unittest.TestCase):
         food_audit = report["food"]
         self.assertTrue(food_audit["required_columns_present"])
         self.assertGreater(food_audit["row_count"], 0)
-        self.assertIn("None", food_audit["allergy_risk_distribution"])
+        has_no_risk_or_none = (
+            "No Risk" in food_audit["allergy_risk_distribution"]
+            or "None" in food_audit["allergy_risk_distribution"]
+        )
+        self.assertTrue(has_no_risk_or_none)
+
+    def test_knowledge_base_allergy_lookup_methods(self):
+        # Canonical lookup
+        self.assertEqual(self.kb.lookup_food_allergy_risk("Almonds"), "High")
+        # Alternate name lookup
+        self.assertEqual(self.kb.lookup_food_allergy_risk("badam"), "High")
+        # No Risk lookup
+        self.assertEqual(self.kb.lookup_food_allergy_risk("Citric Acid"), "No Risk")
+        # Unknown lookup
+        self.assertIsNone(self.kb.lookup_food_allergy_risk("UnknownItem123"))
 
 
 if __name__ == "__main__":

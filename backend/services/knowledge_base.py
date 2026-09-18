@@ -3,8 +3,8 @@ import os
 import re
 from pathlib import Path
 
-DEFAULT_FOOD_DATA_PATH = "data/food/ingredient_knowledge_base_500_cleaned.csv"
-FALLBACK_FOOD_DATA_PATH = "data/food/ingredient_knowledge_base_500_with_alternate_names.csv"
+DEFAULT_FOOD_DATA_PATH = "data/food/food_ingredients_dataset_corrected(2)(1).csv"
+FALLBACK_FOOD_DATA_PATH = "data/food/ingredient_knowledge_base_500_cleaned.csv"
 
 DEFAULT_PERSONAL_CARE_DATA_PATH = "data/personal_care/personal_care_ingredients_dataset_cleaned.xlsx"
 FALLBACK_PERSONAL_CARE_DATA_PATH = "data/personal_care/personal_care_ingredients_dataset_csv.xlsx"
@@ -89,6 +89,31 @@ class KnowledgeBase:
         report["nutrition"] = _audit_records(self.nutrition, "Nutrition", "Nutrient", "Alternative / Packaging Names", REQUIRED_NUTRITION_COLUMNS)
         report["warnings"] = self.warnings
         return report
+
+    def get_food_ingredient(self, query):
+        """
+        Retrieves canonical food ingredient record matching canonical name or alias.
+        Returns the full row dict if found, else None.
+        """
+        if not query or not isinstance(query, str):
+            return None
+        norm_key = normalize_value(query)
+        return self.food_index.get(norm_key)
+
+    def lookup_food_allergy_risk(self, query):
+        """
+        Returns the raw Allergy Risk ('No Risk', 'Low', 'Medium', 'High')
+        for the given food ingredient query (canonical name or alias), or None if not found.
+        """
+        row = self.get_food_ingredient(query)
+        if row:
+            val = row.get("Allergy Risk")
+            if val is not None and str(val).strip():
+                clean_val = str(val).strip()
+                if clean_val.lower() == "none":
+                    return "No Risk"
+                return clean_val
+        return None
 
 
 def normalize_value(value):

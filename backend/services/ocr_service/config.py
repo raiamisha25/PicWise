@@ -21,13 +21,16 @@ INPUT_DIR = os.path.join(PROJECT_ROOT, "input")
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 KNOWLEDGE_BASE_DIR = os.path.join(PROJECT_ROOT, "knowledge_base")
 
-_DEFAULT_ING_CSV = os.path.join(PICWISE_ROOT, "data", "food", "ingredient_knowledge_base_500_with_alternate_names.csv")
+_DEFAULT_ING_CSV = os.path.join(PICWISE_ROOT, "data", "food", "food_ingredients_dataset_corrected(2)(1).csv")
+_FALLBACK_ING_CSV = os.path.join(PICWISE_ROOT, "data", "food", "ingredient_knowledge_base_500_with_alternate_names.csv")
 _DEFAULT_NUT_CSV = os.path.join(PICWISE_ROOT, "data", "nutrition", "nutrition_knowledge_dataset.csv")
 _DEFAULT_PC_XLSX = os.path.join(PICWISE_ROOT, "data", "personal_care", "personal_care_ingredients_dataset_csv.xlsx")
 
 INGREDIENT_KB_CSV = os.getenv(
     "FOOD_DATA_PATH",
-    _DEFAULT_ING_CSV if os.path.exists(_DEFAULT_ING_CSV) else os.path.join(KNOWLEDGE_BASE_DIR, "ingredient_knowledge_base_500_with_alternate_names.csv")
+    _DEFAULT_ING_CSV if os.path.exists(_DEFAULT_ING_CSV) else (
+        _FALLBACK_ING_CSV if os.path.exists(_FALLBACK_ING_CSV) else os.path.join(KNOWLEDGE_BASE_DIR, "food_ingredients_dataset_corrected(2)(1).csv")
+    )
 )
 NUTRITION_KB_CSV = os.getenv(
     "NUTRITION_DATA_PATH",

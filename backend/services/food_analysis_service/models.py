@@ -36,17 +36,10 @@ class FoodSafetyResult:
         return {k: v for k, v in asdict(self).items() if v is not None}
 
 
-@dataclass
-class AllergyResult:
-    """Component result for Allergy detection."""
-    status: str = "Unavailable"
-    allergens_detected: List[str] = field(default_factory=list)
-    details: str = "Allergy analysis engine is not yet implemented or production-ready in this phase."
-    warnings: List[str] = field(default_factory=lambda: ["Allergy detection service is currently unavailable."])
-    error: Optional[str] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {k: v for k, v in asdict(self).items() if v is not None}
+from backend.services.allergy_service.models import (
+    AllergyIngredientResult,
+    AllergyResult,
+)
 
 
 @dataclass
