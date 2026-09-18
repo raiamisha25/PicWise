@@ -1,4 +1,5 @@
 const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+const maxFileSizeBytes = 16 * 1024 * 1024; // 16 MB
 const unavailable = "Information not available";
 
 const form = document.querySelector("#uploadForm");
@@ -12,8 +13,29 @@ const analyzeButton = document.querySelector("#analyzeButton");
 const loadingState = document.querySelector("#loadingState");
 const resultsPanel = document.querySelector("#resultsPanel");
 
+// Food-specific result elements
+const foodResultsContainer = document.querySelector("#foodResultsContainer");
+const personalCareResultsContainer = document.querySelector("#personalCareResultsContainer");
+const foodWarningsBanner = document.querySelector("#foodWarningsBanner");
+const foodWarningsList = document.querySelector("#foodWarningsList");
+
+const foodSafetyStatusBadge = document.querySelector("#foodSafetyStatusBadge");
+const foodSafetyCount = document.querySelector("#foodSafetyCount");
+const foodSafetyIngredientsList = document.querySelector("#foodSafetyIngredientsList");
+
+const nutritionStatusBadge = document.querySelector("#nutritionStatusBadge");
+const nutritionScoreValue = document.querySelector("#nutritionScoreValue");
+const nutritionScoreDenominator = document.querySelector("#nutritionScoreDenominator");
+const nutritionScoreNote = document.querySelector("#nutritionScoreNote");
+const nutritionNutrientsList = document.querySelector("#nutritionNutrientsList");
+
+const allergyStatusBadge = document.querySelector("#allergyStatusBadge");
+const allergyDetectedList = document.querySelector("#allergyDetectedList");
+const allergyEmptyNotice = document.querySelector("#allergyEmptyNotice");
+
 let selectedFile = null;
 
+// Event Listeners
 input.addEventListener("change", () => {
   setSelectedFile(input.files[0]);
 });
@@ -30,7 +52,9 @@ dropZone.addEventListener("dragleave", () => {
 dropZone.addEventListener("drop", (event) => {
   event.preventDefault();
   dropZone.classList.remove("dragging");
-  setSelectedFile(event.dataTransfer.files[0]);
+  if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+    setSelectedFile(event.dataTransfer.files[0]);
+  }
 });
 
 removeImage.addEventListener("click", () => {
@@ -40,8 +64,10 @@ removeImage.addEventListener("click", () => {
   previewWrap.classList.add("hidden");
   analyzeButton.disabled = true;
   fileError.textContent = "";
+  resetResults();
 });
 
+// Form Submission
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!selectedFile) {
@@ -60,34 +86,46 @@ form.addEventListener("submit", async (event) => {
   formData.append("image", selectedFile);
   formData.append("category", selectedCategory);
 
-  loadingState.classList.remove("hidden");
-  resultsPanel.classList.add("hidden");
-  analyzeButton.disabled = true;
+  setLoadingState(true);
+  resetResults();
+  fileError.textContent = "";
 
   try {
-    const response = await fetch("/api/analyze", {
+    const endpoint = selectedCategory === "food" ? "/api/food/analyze" : "/api/analyze";
+    const response = await fetch(endpoint, {
       method: "POST",
       body: formData,
     });
-    const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data.error || "Analysis failed.");
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseErr) {
+      throw new Error("Received an invalid response from the server.");
     }
 
-    renderResults(data);
+    if (!response.ok) {
+      const errMsg = (data && data.error) || (data && Array.isArray(data.errors) && data.errors[0]) || "Analysis failed.";
+      throw new Error(errMsg);
+    }
+
+    if (selectedCategory === "food") {
+      renderFoodAnalysis(data);
+    } else {
+      renderPersonalCareAnalysis(data);
+    }
+
     resultsPanel.classList.remove("hidden");
   } catch (error) {
-    fileError.textContent = error.message;
+    fileError.textContent = error.message || "An error occurred during analysis.";
   } finally {
-    loadingState.classList.add("hidden");
-    analyzeButton.disabled = false;
+    setLoadingState(false);
   }
 });
 
 function setSelectedFile(file) {
   fileError.textContent = "";
-  resultsPanel.classList.add("hidden");
+  resetResults();
 
   if (!file) {
     return;
@@ -102,63 +140,241 @@ function setSelectedFile(file) {
     return;
   }
 
+  if (file.size > maxFileSizeBytes) {
+    selectedFile = null;
+    input.value = "";
+    previewWrap.classList.add("hidden");
+    analyzeButton.disabled = true;
+    fileError.textContent = "Image exceeds the maximum allowed size of 16MB.";
+    return;
+  }
+
   selectedFile = file;
   previewImage.src = URL.createObjectURL(file);
   previewWrap.classList.remove("hidden");
   analyzeButton.disabled = false;
 }
 
-function renderResults(data) {
+function setLoadingState(isLoading) {
+  if (isLoading) {
+    loadingState.classList.remove("hidden");
+    analyzeButton.disabled = true;
+  } else {
+    loadingState.classList.add("hidden");
+    analyzeButton.disabled = !selectedFile;
+  }
+}
+
+function resetResults() {
+  resultsPanel.classList.add("hidden");
+  if (foodResultsContainer) foodResultsContainer.classList.add("hidden");
+  if (personalCareResultsContainer) personalCareResultsContainer.classList.add("hidden");
+}
+
+/* ==========================================================================
+   FOOD ANALYSIS RENDERING (Phase 9J)
+   Consumes backend presentation object strictly.
+   NO overall product health score, NO overall product color.
+   ========================================================================== */
+function renderFoodAnalysis(data) {
+  if (personalCareResultsContainer) personalCareResultsContainer.classList.add("hidden");
+  if (foodResultsContainer) foodResultsContainer.classList.remove("hidden");
+
+  const pres = data.presentation || {};
+
+  renderFoodSafetyCard(data, pres.food_safety);
+  renderNutritionCard(data, pres.nutrition);
+  renderAllergyCard(data, pres.allergy);
+  renderFoodWarnings(data.warnings);
+}
+
+/**
+ * Renders the Food Safety card based strictly on backend presentation status.
+ */
+function renderFoodSafetyCard(data, fsPres) {
+  fsPres = fsPres || {};
+  const status = fsPres.color || fsPres.status || "unavailable";
+  const label = fsPres.label || "Unavailable";
+
+  foodSafetyStatusBadge.className = `status-pill ${escapeHtml(status)}`;
+  foodSafetyStatusBadge.textContent = label;
+
+  const totalCount = data.food_safety?.total_ingredients || (data.food_safety?.ingredients ? data.food_safety.ingredients.length : 0);
+  foodSafetyCount.textContent = String(totalCount);
+
+  foodSafetyIngredientsList.innerHTML = "";
+  const ingredients = data.food_safety?.ingredients || [];
+
+  if (ingredients.length === 0) {
+    const emptyNotice = document.createElement("p");
+    emptyNotice.className = "allergy-empty-notice";
+    emptyNotice.textContent = "No ingredients detected by OCR.";
+    foodSafetyIngredientsList.appendChild(emptyNotice);
+    return;
+  }
+
+  ingredients.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "ingredient-badge-row";
+
+    const itemStatus = item.presentation_status || (item.presentation && item.presentation.status) || "unavailable";
+    const itemLabel = (item.presentation && item.presentation.label) || item.risk_class || "Assessed";
+    const name = item.ingredient || item.matched_name || item.raw_text || unavailable;
+    const confStr = Number.isFinite(item.confidence) ? `Confidence: ${Math.round(item.confidence * 100)}%` : "";
+
+    row.innerHTML = `
+      <div class="ingredient-info">
+        <span class="ingredient-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+        ${confStr ? `<span class="ingredient-confidence">${escapeHtml(confStr)}</span>` : ""}
+      </div>
+      <span class="status-pill ${escapeHtml(itemStatus)}">${escapeHtml(itemLabel)}</span>
+    `;
+    foodSafetyIngredientsList.appendChild(row);
+  });
+}
+
+/**
+ * Renders the Nutrition card based strictly on backend presentation status and score.
+ * Never defaults missing data to 0 or red.
+ */
+function renderNutritionCard(data, nutPres) {
+  nutPres = nutPres || {};
+  const status = nutPres.color || nutPres.status || "unavailable";
+  const label = nutPres.label || "Unavailable";
+
+  nutritionStatusBadge.className = `status-pill ${escapeHtml(status)}`;
+  nutritionStatusBadge.textContent = label;
+
+  const score = nutPres.score !== undefined && nutPres.score !== null
+    ? nutPres.score
+    : (data.nutrition && data.nutrition.nutrition_score !== undefined ? data.nutrition.nutrition_score : null);
+
+  if (typeof score === "number" && !isNaN(score)) {
+    const formattedScore = Number.isInteger(score) ? score : score.toFixed(1);
+    nutritionScoreValue.textContent = formattedScore;
+    nutritionScoreDenominator.classList.remove("hidden");
+    nutritionScoreNote.textContent = label;
+  } else {
+    nutritionScoreValue.textContent = "Unavailable";
+    nutritionScoreDenominator.classList.add("hidden");
+    nutritionScoreNote.textContent = "Nutrition facts not detected on label";
+  }
+
+  // Key nutrients breakdown
+  nutritionNutrientsList.innerHTML = "";
+  const components = data.nutrition?.components || data.nutrition?.nutrients;
+
+  if (components && typeof components === "object" && Object.keys(components).length > 0) {
+    Object.entries(components).forEach(([key, val]) => {
+      const card = document.createElement("div");
+      card.className = "nutrient-card";
+      let displayVal = unavailable;
+
+      if (val && typeof val === "object") {
+        if (val.value !== undefined && val.value !== null) {
+          displayVal = `${val.value} ${val.unit || "g"}`.trim();
+        } else if (val.amount !== undefined && val.amount !== null) {
+          displayVal = `${val.amount} ${val.unit || "g"}`.trim();
+        }
+      } else if (val !== null && val !== undefined) {
+        displayVal = String(val);
+      }
+
+      card.innerHTML = `
+        <span class="nutrient-name">${escapeHtml(formatNutrientName(key))}</span>
+        <span class="nutrient-value">${escapeHtml(displayVal)}</span>
+      `;
+      nutritionNutrientsList.appendChild(card);
+    });
+  } else {
+    const emptyNotice = document.createElement("p");
+    emptyNotice.className = "allergy-empty-notice";
+    emptyNotice.style.gridColumn = "1 / -1";
+    emptyNotice.textContent = "Detailed nutrient breakdown unavailable.";
+    nutritionNutrientsList.appendChild(emptyNotice);
+  }
+}
+
+/**
+ * Renders the Allergy Risk card based strictly on backend presentation status.
+ * CRITICAL: Renders allergen items ONLY if returned in data.allergy.allergens_detected.
+ * Never fabricates or guesses allergens from risk levels.
+ */
+function renderAllergyCard(data, alPres) {
+  alPres = alPres || {};
+  const status = alPres.color || alPres.status || "unavailable";
+  const label = alPres.label || "Unavailable";
+
+  allergyStatusBadge.className = `status-pill ${escapeHtml(status)}`;
+  allergyStatusBadge.textContent = label;
+
+  allergyDetectedList.innerHTML = "";
+
+  const allergensDetected = data.allergy?.allergens_detected;
+
+  if (Array.isArray(allergensDetected) && allergensDetected.length > 0) {
+    allergyEmptyNotice.classList.add("hidden");
+    allergensDetected.forEach((allergen) => {
+      const pill = document.createElement("span");
+      pill.className = "allergen-item-pill";
+      pill.innerHTML = `
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span>${escapeHtml(allergen)}</span>
+      `;
+      allergyDetectedList.appendChild(pill);
+    });
+  } else {
+    allergyEmptyNotice.classList.remove("hidden");
+    if (status === "green") {
+      allergyEmptyNotice.textContent = "No allergens detected in scanned ingredients.";
+    } else if (status === "unavailable") {
+      allergyEmptyNotice.textContent = "Allergen information not available.";
+    } else {
+      allergyEmptyNotice.textContent = "No specific allergens listed by name in scanned text.";
+    }
+  }
+}
+
+/**
+ * Renders non-fatal warnings or notices from the backend.
+ */
+function renderFoodWarnings(warnings) {
+  if (Array.isArray(warnings) && warnings.length > 0) {
+    foodWarningsList.innerHTML = "";
+    warnings.forEach((warn) => {
+      const li = document.createElement("li");
+      li.textContent = warn;
+      foodWarningsList.appendChild(li);
+    });
+    foodWarningsBanner.classList.remove("hidden");
+  } else {
+    foodWarningsBanner.classList.add("hidden");
+  }
+}
+
+/* ==========================================================================
+   PERSONAL CARE RENDERING (Backward Compatibility)
+   ========================================================================== */
+function renderPersonalCareAnalysis(data) {
+  if (foodResultsContainer) foodResultsContainer.classList.add("hidden");
+  if (personalCareResultsContainer) personalCareResultsContainer.classList.remove("hidden");
+
   document.querySelector("#productName").textContent = valueOrUnavailable(data.product?.name);
   document.querySelector("#productBrand").textContent = valueOrUnavailable(data.product?.brand);
   document.querySelector("#productDomain").textContent = formatDomain(data.product?.domain);
 
   renderList("#ingredientsList", data.ingredients, renderIngredient);
-  renderList("#foodDetails", foodItems(data.ingredients), renderFoodDetail);
-
-  const isPersonalCare = data.product?.domain === "personal_care";
-  const nutritionContainer = document.querySelector("#nutritionList");
-  nutritionContainer.innerHTML = "";
-
-  if (isPersonalCare) {
-    const naItem = resultItem("Nutrition Facts", [
-      ["Status", "Not applicable for personal care products."]
-    ]);
-    nutritionContainer.appendChild(naItem);
-  } else {
-    let nutritionItems = [];
-    if (data.nutrition && typeof data.nutrition === "object" && !Array.isArray(data.nutrition)) {
-      nutritionItems = Object.entries(data.nutrition).map(([key, val]) => {
-        let valStr = unavailable;
-        let per100gStr = null;
-        if (val && typeof val === "object") {
-          if (val.value !== undefined) {
-            valStr = `${val.value} ${val.unit || ""}`.trim();
-          }
-          if (val.per_100g && val.per_100g.value !== undefined) {
-            per100gStr = `${val.per_100g.value} ${val.per_100g.unit || ""}`.trim();
-          }
-        } else if (val !== undefined && val !== null) {
-          valStr = String(val);
-        }
-        return {
-          nutrient: formatNutrientName(key),
-          value: valStr,
-          per100g: per100gStr,
-        };
-      });
-    } else if (Array.isArray(data.nutrition)) {
-      nutritionItems = data.nutrition;
-    }
-    renderList("#nutritionList", nutritionItems, renderNutrition);
-  }
-
   renderList("#personalCareList", data.personalCare, renderPersonalCare);
   renderList("#warningsList", data.warnings, renderWarning);
 }
 
 function renderList(selector, items, renderer) {
   const container = document.querySelector(selector);
+  if (!container) return;
   container.innerHTML = "";
 
   if (!items || items.length === 0) {
@@ -176,54 +392,7 @@ function renderIngredient(item) {
     ["Safety level", item.safetyLevel],
     ["Allergy risk", item.allergyRisk],
   ];
-  if (item.foodSafety && Number.isFinite(item.foodSafety.confidence)) {
-    pairs.push(["Safety confidence", (item.foodSafety.confidence * 100).toFixed(1) + "%"]);
-  }
-  return resultItem(
-    valueOrUnavailable(item.name),
-    pairs,
-  );
-}
-
-function renderFoodDetail(item) {
-  return resultItem(
-    valueOrUnavailable(item.name),
-    [
-      ["Health impact", item.healthImpact],
-      ["Processing level", item.processingLevel],
-      ["Allergy risk", item.allergyRisk],
-      ["Safety level", item.safetyLevel],
-    ],
-  );
-}
-
-function renderNutrition(item) {
-  const pairs = [];
-  if (item.value !== undefined) {
-    pairs.push(["Amount", item.value]);
-  }
-  if (item.per100g) {
-    pairs.push(["Per 100g", item.per100g]);
-  }
-  if (item.role) {
-    pairs.push(["Role", item.role]);
-  }
-  if (item.healthImpact) {
-    pairs.push(["Health impact", item.healthImpact]);
-  }
-  if (pairs.length === 0) {
-    pairs.push(["Amount", unavailable]);
-  }
-  return resultItem(
-    valueOrUnavailable(item.nutrient || item.name),
-    pairs
-  );
-}
-
-function formatNutrientName(key) {
-  return String(key)
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+  return resultItem(valueOrUnavailable(item.name), pairs);
 }
 
 function renderPersonalCare(item) {
@@ -262,15 +431,17 @@ function emptyItem() {
   return resultItem(unavailable, [["Status", unavailable]]);
 }
 
-function foodItems(items) {
-  return (items || []).filter((item) => item.domain === "food");
-}
-
 function formatDomain(domain) {
   if (domain === "food") return "Food";
   if (domain === "personal_care") return "Personal Care";
   if (domain === "unknown") return "Unknown";
   return unavailable;
+}
+
+function formatNutrientName(key) {
+  return String(key)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function valueOrUnavailable(value) {

@@ -79,51 +79,153 @@
   </section>
 
   <section id="resultsPanel" class="results-panel card hidden" aria-live="polite">
-    <div class="section-title-row results-heading">
-      <div>
-        <h2>Product Summary</h2>
-        <p>Missing fields are shown as Information not available.</p>
+    <!-- Food Analysis Results Container -->
+    <div id="foodResultsContainer" class="hidden">
+      <div class="section-title-row results-heading">
+        <div>
+          <h2>Food Product Analysis</h2>
+          <p>Independent assessments across Safety, Nutrition, and Allergens.</p>
+        </div>
+      </div>
+
+      <!-- Food Warnings Banner (Hidden by default, displayed if warnings exist) -->
+      <div id="foodWarningsBanner" class="warning-banner hidden" role="alert">
+        <div class="warning-banner-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>
+        <div class="warning-banner-content">
+          <strong>Notices & Warnings</strong>
+          <ul id="foodWarningsList"></ul>
+        </div>
+      </div>
+
+      <!-- Three Independent Dimension Cards Grid -->
+      <div class="food-cards-grid">
+        <!-- 1. Food Safety Card -->
+        <div id="foodSafetyCard" class="dimension-card">
+          <div class="card-header-row">
+            <div class="dimension-title-group">
+              <span class="dimension-icon">🛡️</span>
+              <div>
+                <h3 class="dimension-title">Food Safety</h3>
+                <span class="dimension-subtitle">ML-based ingredient classification</span>
+              </div>
+            </div>
+            <span id="foodSafetyStatusBadge" class="status-pill unavailable">Unavailable</span>
+          </div>
+
+          <div class="dimension-body">
+            <div class="meta-stat-row">
+              <span class="meta-label">Ingredients Assessed:</span>
+              <strong id="foodSafetyCount" class="meta-value">0</strong>
+            </div>
+
+            <div class="ingredient-breakdown">
+              <h4 class="breakdown-title">Ingredient Risk Breakdown</h4>
+              <div id="foodSafetyIngredientsList" class="ingredient-badges-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Nutrition Card -->
+        <div id="nutritionCard" class="dimension-card">
+          <div class="card-header-row">
+            <div class="dimension-title-group">
+              <span class="dimension-icon">🥗</span>
+              <div>
+                <h3 class="dimension-title">Nutrition</h3>
+                <span class="dimension-subtitle">Deterministic 0–100 profiling</span>
+              </div>
+            </div>
+            <span id="nutritionStatusBadge" class="status-pill unavailable">Unavailable</span>
+          </div>
+
+          <div class="dimension-body">
+            <div class="nutrition-score-box">
+              <span class="score-label">Nutrition Score</span>
+              <div class="score-value-row">
+                <span id="nutritionScoreValue" class="score-number">—</span>
+                <span id="nutritionScoreDenominator" class="score-denominator">/ 100</span>
+              </div>
+              <span id="nutritionScoreNote" class="score-note"></span>
+            </div>
+
+            <div class="nutrition-nutrients-section">
+              <h4 class="breakdown-title">Key Nutrients</h4>
+              <div id="nutritionNutrientsList" class="nutrients-grid"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Allergy Risk Card -->
+        <div id="allergyCard" class="dimension-card">
+          <div class="card-header-row">
+            <div class="dimension-title-group">
+              <span class="dimension-icon">⚠️</span>
+              <div>
+                <h3 class="dimension-title">Allergy Risk</h3>
+                <span class="dimension-subtitle">Knowledge-base allergen lookup</span>
+              </div>
+            </div>
+            <span id="allergyStatusBadge" class="status-pill unavailable">Unavailable</span>
+          </div>
+
+          <div class="dimension-body">
+            <div class="allergy-content-section">
+              <h4 class="breakdown-title">Detected Allergens</h4>
+              <!-- Allergen list populated strictly from backend allergens_detected -->
+              <div id="allergyDetectedContainer" class="allergy-detected-wrap">
+                <div id="allergyDetectedList" class="allergen-pills-wrap"></div>
+                <p id="allergyEmptyNotice" class="allergy-empty-notice hidden">No specific allergens detected in scanned ingredients.</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="summary-grid">
-      <div>
-        <span>Name</span>
-        <strong id="productName">Information not available</strong>
+    <!-- Personal Care Results Container (Preserved for backwards compatibility) -->
+    <div id="personalCareResultsContainer" class="hidden">
+      <div class="section-title-row results-heading">
+        <div>
+          <h2>Product Summary</h2>
+          <p>Missing fields are shown as Information not available.</p>
+        </div>
       </div>
-      <div>
-        <span>Brand</span>
-        <strong id="productBrand">Information not available</strong>
+
+      <div class="summary-grid">
+        <div>
+          <span>Name</span>
+          <strong id="productName">Information not available</strong>
+        </div>
+        <div>
+          <span>Brand</span>
+          <strong id="productBrand">Information not available</strong>
+        </div>
+        <div>
+          <span>Domain</span>
+          <strong id="productDomain">Information not available</strong>
+        </div>
       </div>
-      <div>
-        <span>Domain</span>
-        <strong id="productDomain">Information not available</strong>
+
+      <div class="result-section">
+        <h3>Ingredients</h3>
+        <div id="ingredientsList" class="result-list"></div>
       </div>
-    </div>
 
-    <div class="result-section">
-      <h3>Ingredients</h3>
-      <div id="ingredientsList" class="result-list"></div>
-    </div>
+      <div class="result-section">
+        <h3>Personal Care Details</h3>
+        <div id="personalCareList" class="result-list"></div>
+      </div>
 
-    <div class="result-section">
-      <h3>Food Details</h3>
-      <div id="foodDetails" class="result-list"></div>
-    </div>
-
-    <div class="result-section">
-      <h3>Nutrition</h3>
-      <div id="nutritionList" class="result-list"></div>
-    </div>
-
-    <div class="result-section">
-      <h3>Personal Care Details</h3>
-      <div id="personalCareList" class="result-list"></div>
-    </div>
-
-    <div class="result-section">
-      <h3>Warnings</h3>
-      <div id="warningsList" class="result-list"></div>
+      <div class="result-section">
+        <h3>Warnings</h3>
+        <div id="warningsList" class="result-list"></div>
+      </div>
     </div>
   </section>
 
