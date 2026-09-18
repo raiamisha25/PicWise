@@ -193,6 +193,35 @@ class TestFoodAnalysisPipeline(unittest.TestCase):
             self.assertEqual(al["product_ui_label"], "Moderate Allergy Risk")
             self.assertEqual(al["allergens_detected"], ["Refined Wheat Flour (Maida)"])
 
+            # Phase 9H: Check presentation field in unified response
+            self.assertIn("presentation", res_dict)
+            pres = res_dict["presentation"]
+            self.assertIsNotNone(pres)
+            self.assertIn("food_safety", pres)
+            self.assertIn("allergy", pres)
+            self.assertIn("nutrition", pres)
+            # CRITICAL CONSTRAINT: No overall product health score, no overall color, no overall verdict
+            self.assertNotIn("overall_status", pres)
+            self.assertNotIn("overall_color", pres)
+            self.assertNotIn("overall_score", pres)
+            self.assertNotIn("product_color", pres)
+
+            # Check ingredient-level presentation status
+            for ing in fs["ingredients"]:
+                self.assertIn("presentation_status", ing)
+                self.assertIn(ing["presentation_status"], ["green", "yellow", "orange", "red", "unavailable"])
+                self.assertIn("presentation", ing)
+
+            # Check Nutrition presentation status
+            self.assertIn("presentation_status", nut)
+            self.assertIn(nut["presentation_status"], ["green", "yellow", "orange", "red", "unavailable"])
+            self.assertEqual(pres["nutrition"]["score"], nut["nutrition_score"])
+
+            # Check Allergy presentation status (Medium -> orange, Moderate Allergy Risk)
+            self.assertEqual(al["presentation_status"], "orange")
+            self.assertEqual(pres["allergy"]["status"], "orange")
+            self.assertEqual(pres["allergy"]["label"], "Moderate Allergy Risk")
+
     # ----------------------------------------------------------------------
     # 4. Nutrition Insufficient Data Handling
     # ----------------------------------------------------------------------
@@ -217,6 +246,11 @@ class TestFoodAnalysisPipeline(unittest.TestCase):
             self.assertIsNone(nut["nutrition_score"])
             self.assertEqual(nut["status"], "Insufficient Nutrition Data")
             self.assertIn("energy", nut["nutrients_missing"])
+
+            # Phase 9H: Nutrition presentation for insufficient data
+            self.assertEqual(nut["presentation_status"], "unavailable")
+            self.assertEqual(nut["presentation"]["status"], "unavailable")
+            self.assertIsNone(nut["presentation"].get("label"))
 
     # ----------------------------------------------------------------------
     # 5. Food Safety No-Ingredients Handling
@@ -262,6 +296,11 @@ class TestFoodAnalysisPipeline(unittest.TestCase):
             self.assertEqual(al["product_risk_level"], "High")
             self.assertEqual(al["product_ui_label"], "High Allergy Risk")
             self.assertEqual(al["allergens_detected"], ["Peanuts"])
+
+            # Phase 9H: Allergy presentation status (High -> red, High Allergy Risk)
+            self.assertEqual(al["presentation_status"], "red")
+            self.assertEqual(al["presentation"]["status"], "red")
+            self.assertEqual(al["presentation"]["label"], "High Allergy Risk")
 
     # ----------------------------------------------------------------------
     # 7. Partial Failure Resilience
@@ -422,6 +461,16 @@ class TestFoodAnalysisPipeline(unittest.TestCase):
         self.assertEqual(result.allergy["status"], "success")
         self.assertEqual(result.allergy["product_risk_level"], "No Risk")
         self.assertEqual(result.allergy["product_ui_label"], "Allergen-Free")
+        self.assertEqual(result.allergy["presentation_status"], "green")
+
+        # Phase 9H: Presentation structure verification
+        self.assertIsNotNone(result.presentation)
+        self.assertIn("food_safety", result.presentation)
+        self.assertIn("allergy", result.presentation)
+        self.assertIn("nutrition", result.presentation)
+        self.assertNotIn("overall_status", result.presentation)
+        self.assertNotIn("overall_color", result.presentation)
+        self.assertNotIn("overall_score", result.presentation)
 
     # ----------------------------------------------------------------------
     # 11. Dedicated API Endpoint Tests (/api/food/analyze)
@@ -446,6 +495,17 @@ class TestFoodAnalysisPipeline(unittest.TestCase):
         self.assertEqual(data["allergy"]["status"], "success")
         self.assertEqual(data["allergy"]["product_risk_level"], "No Risk")
         self.assertEqual(data["allergy"]["product_ui_label"], "Allergen-Free")
+        self.assertEqual(data["allergy"]["presentation_status"], "green")
+
+        # Phase 9H: API response presentation verification
+        self.assertIn("presentation", data)
+        self.assertIn("food_safety", data["presentation"])
+        self.assertIn("allergy", data["presentation"])
+        self.assertIn("nutrition", data["presentation"])
+        self.assertEqual(data["presentation"]["allergy"]["status"], "green")
+        self.assertNotIn("overall_status", data["presentation"])
+        self.assertNotIn("overall_color", data["presentation"])
+        self.assertNotIn("overall_score", data["presentation"])
 
     def test_api_food_analyze_category_enforcement(self):
         """POST /api/food/analyze strictly requires category='food'."""
@@ -536,6 +596,81 @@ class TestFoodAnalysisPipeline(unittest.TestCase):
         self.assertIn("ingredients", data)
         self.assertIn("nutrition", data)
         self.assertEqual(data["personalCare"], [])
+
+    # ----------------------------------------------------------------------
+    # 13. Phase 9H Presentation Status Mapping Integration & Dimension Independence
+    # ----------------------------------------------------------------------
+    def test_phase9h_presentation_status_mapping_integration(self):
+        """Phase 9H: Validate that presentation status mapping is integrated across all 3 independent dimensions.
+        Strictly verifies:
+        - food_safety, allergy, and nutrition independent presentation objects
+        - Safe -> yellow (never green) in ingredient presentations
+        - No overall product health score, no overall color, no overall verdict
+        - Missing nutrition != 0 (unavailable)
+        """
+        dummy_bytes = _create_dummy_image_bytes()
+        mocked_ocr_output = {
+            "domain": "food",
+            "ingredients": [
+                {"matched_name": "Sugar", "raw_text": "Sugar"},
+                {"matched_name": "Almonds", "raw_text": "Almonds"},
+            ],
+            "nutrition": {
+                "energy": {"value": 500.0, "unit": "kcal", "per_100g": {"value": 500.0, "unit": "kcal"}},
+                "total_sugars": {"value": 30.0, "unit": "g", "per_100g": {"value": 30.0, "unit": "g"}},
+                "total_fat": {"value": 20.0, "unit": "g", "per_100g": {"value": 20.0, "unit": "g"}},
+                "saturated_fat": {"value": 5.0, "unit": "g", "per_100g": {"value": 5.0, "unit": "g"}},
+                "sodium": {"value": 100.0, "unit": "mg", "per_100g": {"value": 100.0, "unit": "mg"}},
+            },
+            "raw_text": {"all_text": "Sugar Almonds", "ingredients_text": "Sugar, Almonds", "nutrition_text": ""},
+        }
+
+        with patch("backend.services.food_analysis_service.analyzer.run_ocr", return_value=mocked_ocr_output):
+            result = analyze_food(dummy_bytes, category="food")
+            self.assertTrue(result.success)
+
+            # Top-level presentation dictionary exists
+            self.assertIsNotNone(result.presentation)
+            pres = result.presentation
+
+            # 1. Food Safety Dimension (Ingredient Level)
+            self.assertIn("food_safety", pres)
+            self.assertIn("ingredients", result.food_safety)
+            for ing in result.food_safety["ingredients"]:
+                self.assertIn("presentation_status", ing)
+                self.assertIn(ing["presentation_status"], ["green", "yellow", "orange", "red", "unavailable"])
+                # Explicit constraint check: If risk_class is 'Safe', presentation_status MUST be 'yellow', NEVER 'green'
+                if ing.get("risk_class") == "Safe":
+                    self.assertEqual(ing["presentation_status"], "yellow")
+                    self.assertEqual(ing["presentation"]["status"], "yellow")
+
+            # 2. Allergy Dimension (Deterministic KB lookup: Almonds -> High -> red)
+            self.assertIn("allergy", pres)
+            self.assertEqual(pres["allergy"]["risk_level"], "High")
+            self.assertEqual(pres["allergy"]["status"], "red")
+            self.assertEqual(pres["allergy"]["label"], "High Allergy Risk")
+
+            # 3. Nutrition Dimension (Deterministic 0-100 score -> independent bracket)
+            self.assertIn("nutrition", pres)
+            nut_score = result.nutrition["nutrition_score"]
+            self.assertIsNotNone(nut_score)
+            self.assertEqual(pres["nutrition"]["score"], nut_score)
+            if nut_score <= 25.0:
+                self.assertEqual(pres["nutrition"]["status"], "red")
+            elif nut_score <= 50.0:
+                self.assertEqual(pres["nutrition"]["status"], "orange")
+            elif nut_score <= 75.0:
+                self.assertEqual(pres["nutrition"]["status"], "yellow")
+            else:
+                self.assertEqual(pres["nutrition"]["status"], "green")
+
+            # 4. Strict Absence of Any Overall Product Color or Score
+            self.assertNotIn("overall_status", pres)
+            self.assertNotIn("overall_color", pres)
+            self.assertNotIn("overall_score", pres)
+            self.assertNotIn("product_color", pres)
+            self.assertNotIn("verdict", pres)
+            self.assertNotIn("health_score", pres)
 
 
 if __name__ == "__main__":

@@ -56,6 +56,7 @@ class FoodAnalysisResult:
     allergy: Optional[Dict[str, Any]] = None
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
+    presentation: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         fs_val = self.food_safety
@@ -70,7 +71,11 @@ class FoodAnalysisResult:
         if hasattr(nut_val, "to_dict"):
             nut_val = nut_val.to_dict()
 
-        return {
+        pres_val = self.presentation
+        if hasattr(pres_val, "to_dict"):
+            pres_val = pres_val.to_dict()
+
+        d = {
             "category": self.category,
             "success": self.success,
             "ocr": self.ocr,
@@ -80,3 +85,6 @@ class FoodAnalysisResult:
             "errors": list(self.errors),
             "warnings": list(self.warnings),
         }
+        if pres_val is not None:
+            d["presentation"] = pres_val
+        return d

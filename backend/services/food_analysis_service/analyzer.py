@@ -23,6 +23,12 @@ from backend.services.food_analysis_service.models import (
 from backend.services.nutrition_service import calculate_nutrition_score
 from backend.services.ocr_service import run_ocr
 from backend.services.allergy_service import calculate_allergy_risk
+from backend.services.food_status_service import (
+    map_food_safety_status,
+    map_allergy_status,
+    map_nutrition_status,
+    map_food_analysis_presentation,
+)
 
 
 def analyze_food(
@@ -116,7 +122,11 @@ def analyze_food(
                     matched_name=item.get("matched_name"),
                     match_type=item.get("method", "unmatched"),
                 )
-                safety_items.append(safety_entry.to_dict())
+                entry_dict = safety_entry.to_dict()
+                ing_pres = map_food_safety_status(pred.get("risk_class"))
+                entry_dict["presentation_status"] = ing_pres.status
+                entry_dict["presentation"] = ing_pres.to_dict()
+                safety_items.append(entry_dict)
 
             food_safety_dict = FoodSafetyResult(
                 status="success",
@@ -135,6 +145,14 @@ def analyze_food(
                 warnings=[err_msg],
                 error=str(exc),
             ).to_dict()
+
+    # Food Safety presentation mapping
+    # Note: Food Safety ML operates at the ingredient level. If a component-level risk_class
+    # is explicitly present, it is mapped; otherwise status='unavailable' is preserved
+    # without introducing any unestablished product-level aggregation rule.
+    fs_pres = map_food_safety_status(food_safety_dict.get("risk_class"))
+    food_safety_dict["presentation_status"] = fs_pres.status
+    food_safety_dict["presentation"] = fs_pres.to_dict()
 
     # 5. Nutrition Scoring Engine Execution
     raw_nutrition = ocr_output.get("nutrition")
@@ -165,6 +183,19 @@ def analyze_food(
             "error": str(exc),
         }
 
+    # Nutrition presentation mapping
+    nut_score = nutrition_dict.get("nutrition_score")
+    nut_pres = map_nutrition_status(
+        score=nut_score,
+        raw_status=nutrition_dict.get("status"),
+    )
+    nutrition_dict["presentation_status"] = nut_pres.status
+    nutrition_dict["presentation"] = nut_pres.to_dict()
+    if "score" not in nutrition_dict:
+        nutrition_dict["score"] = nut_score
+    if "label" not in nutrition_dict:
+        nutrition_dict["label"] = nut_pres.label
+
     # 6. Allergy Pipeline Execution (Deterministic Knowledge Base Lookup)
     allergy_dict: Dict[str, Any]
     try:
@@ -186,7 +217,27 @@ def analyze_food(
             error=str(exc),
         ).to_dict()
 
-    # 7. Assemble Unified Result
+    # Allergy presentation mapping
+    al_risk = allergy_dict.get("product_risk_level") or allergy_dict.get("risk_level")
+    al_pres = map_allergy_status(
+        risk_level=al_risk,
+        raw_status=allergy_dict.get("status"),
+    )
+    allergy_dict["presentation_status"] = al_pres.status
+    allergy_dict["presentation"] = al_pres.to_dict()
+    if "risk_level" not in allergy_dict and al_risk:
+        allergy_dict["risk_level"] = al_risk
+    if "ui_label" not in allergy_dict and allergy_dict.get("product_ui_label"):
+        allergy_dict["ui_label"] = allergy_dict.get("product_ui_label")
+
+    # 7. Presentation Status Mapping across independent dimensions (Phase 9H)
+    presentation_obj = map_food_analysis_presentation(
+        food_safety=food_safety_dict,
+        allergy=allergy_dict,
+        nutrition=nutrition_dict,
+    )
+
+    # 8. Assemble Unified Result
     return FoodAnalysisResult(
         category="food",
         success=True,
@@ -196,4 +247,5 @@ def analyze_food(
         allergy=allergy_dict,
         errors=[],
         warnings=all_warnings,
+        presentation=presentation_obj.to_dict(),
     )
