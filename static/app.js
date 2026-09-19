@@ -423,7 +423,7 @@ function renderPersonalCareAnalysis(data) {
   });
 
   // 4. Warnings / Notices
-  renderPersonalCareWarnings(data.warnings);
+  renderPersonalCareWarnings(data.warnings, data.ocr_quality_warning);
 }
 
 function renderPersonalCareDimensionCard({
@@ -500,13 +500,22 @@ function renderPersonalCareDimensionCard({
   });
 }
 
-function renderPersonalCareWarnings(warnings) {
-  if (Array.isArray(warnings) && warnings.length > 0) {
+function renderPersonalCareWarnings(warnings, ocrQualityWarning) {
+  const allWarns = Array.isArray(warnings) ? [...warnings] : [];
+  if (ocrQualityWarning && !allWarns.includes(ocrQualityWarning)) {
+    allWarns.unshift(ocrQualityWarning);
+  }
+
+  if (allWarns.length > 0) {
     if (pcWarningsList) {
       pcWarningsList.innerHTML = "";
-      warnings.forEach((warn) => {
+      allWarns.forEach((warn) => {
         const li = document.createElement("li");
         li.textContent = warn;
+        if (ocrQualityWarning && warn === ocrQualityWarning) {
+          li.className = "quality-advisory-item";
+          li.style.fontWeight = "600";
+        }
         pcWarningsList.appendChild(li);
       });
     }

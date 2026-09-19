@@ -25,8 +25,10 @@ class IngredientCorrector:
         if not text:
             return ""
         
-        # Lowercase and standard unicode normalization
-        cleaned = normalize_ocr_text(text)
+        # Lowercase and standard unicode normalization per line to preserve line breaks
+        lines = text.split("\n")
+        cleaned_lines = [normalize_ocr_text(line) for line in lines]
+        cleaned = "\n".join(cl for cl in cleaned_lines if cl)
         
         # Remove common ingredient headings/anchors from the start of the text
         heading_patterns = [
@@ -46,14 +48,14 @@ class IngredientCorrector:
     def split_phrases(self, text):
         """
         Splits a merged ingredient paragraph into individual ingredient tokens.
-        Handles commas and semicolons, while ignoring splits inside parentheses.
+        Handles commas, semicolons, and line breaks (\n), while ignoring splits inside parentheses.
         """
         cleaned = self.clean_text(text)
         if not cleaned:
             return []
 
-        # Split on commas/semicolons, but only if they are not inside parentheses
-        # Using a regex-based split that respects parentheses
+        # Split on commas/semicolons/newlines, but only if they are not inside parentheses
+        # Using a character-based parse that respects parentheses
         tokens = []
         current_token = []
         paren_depth = 0
@@ -64,7 +66,7 @@ class IngredientCorrector:
             elif char == ')':
                 paren_depth = max(0, paren_depth - 1)
             
-            if (char == ',' or char == ';') and paren_depth == 0:
+            if (char in (',', ';', '\n')) and paren_depth == 0:
                 tokens.append("".join(current_token).strip())
                 current_token = []
             else:

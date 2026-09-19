@@ -95,6 +95,30 @@ def analyze_personal_care(
     if not raw_ingredients:
         no_ing_warning = "No ingredients detected in OCR output."
         all_warnings.append(no_ing_warning)
+
+        # Phase 10D: Conservative Image Quality Advisory
+        ocr_quality_advisory = None
+        img_quality = ocr_output.get("image_quality") if ocr_output else None
+        raw_text_dict = ocr_output.get("raw_text", {}) if ocr_output else {}
+        all_text = raw_text_dict.get("all_text", "").strip() if raw_text_dict else ""
+        ing_region = (ocr_output.get("ingredients_region") or {}) if ocr_output else {}
+        line_count = ing_region.get("line_count", 0)
+
+        lap_var = img_quality.get("laplacian_variance") if img_quality else None
+        if lap_var is None and img_quality:
+            lap_var = img_quality.get("laplacian_var")
+
+        is_degraded = (
+            (img_quality and (img_quality.get("is_blurry") or img_quality.get("is_too_dark")))
+            or (len(all_text) > 0 and lap_var is not None and lap_var < 150.0)
+            or (line_count <= 1 and not ing_region.get("anchor") and len(all_text) > 0)
+            or (img_quality and img_quality.get("contrast_std", 100.0) < 25.0)
+        )
+
+        if is_degraded:
+            ocr_quality_advisory = "OCR quality may be unreliable: image appears degraded or blurred. Please capture a clearer, well-lit photo of the ingredient list."
+            all_warnings.append(ocr_quality_advisory)
+
         unav_pres = map_personal_care_presentation(
             safety_status="unavailable",
             allergy_status="unavailable",
@@ -115,6 +139,7 @@ def analyze_personal_care(
             errors=[],
             warnings=all_warnings,
             presentation=unav_pres,
+            ocr_quality_warning=ocr_quality_advisory,
         )
 
     # 4. Target-Isolated Semantic Enrichment and ML Predictions
@@ -262,6 +287,29 @@ def analyze_personal_care(
         "recognized_ingredients": recognized_count,
     }
 
+    ocr_quality_advisory = None
+    if recognized_count == 0:
+        img_quality = ocr_output.get("image_quality") if ocr_output else None
+        ing_region = ocr_output.get("ingredients_region") if ocr_output else {}
+        line_count = ing_region.get("line_count", 0) if ing_region else 0
+        anchor = ing_region.get("anchor") if ing_region else None
+        raw_text_dict = ocr_output.get("raw_text", {}) if ocr_output else {}
+        all_text = raw_text_dict.get("all_text", "").strip() if raw_text_dict else ""
+        lap_var = img_quality.get("laplacian_variance") if img_quality else None
+        if lap_var is None and img_quality:
+            lap_var = img_quality.get("laplacian_var")
+
+        is_degraded = (
+            (img_quality and (img_quality.get("is_blurry") or img_quality.get("is_too_dark")))
+            or (len(all_text) > 0 and lap_var is not None and lap_var < 150.0)
+            or (line_count <= 1 and anchor is None and len(all_text) > 0)
+            or (img_quality and img_quality.get("contrast_std", 100.0) < 25.0)
+        )
+        if is_degraded:
+            ocr_quality_advisory = "OCR quality may be unreliable: image appears degraded or blurred. Please capture a clearer, well-lit photo of the ingredient list."
+            if ocr_quality_advisory not in all_warnings:
+                all_warnings.append(ocr_quality_advisory)
+
     return PersonalCareAnalysisResult(
         category="personal_care",
         success=True,
@@ -270,4 +318,5 @@ def analyze_personal_care(
         errors=[],
         warnings=all_warnings,
         presentation=presentation_dict,
+        ocr_quality_warning=ocr_quality_advisory,
     )

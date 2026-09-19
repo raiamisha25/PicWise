@@ -43,6 +43,129 @@ def _number_hits(text):
     return len(re.findall(r"\d+(\.\d+)?", text))
 
 
+def join_ocr_items_with_line_boundaries(items):
+    """
+    Joins OCR items preserving line breaks (\n) between distinct visual lines,
+    while joining items on the same visual line with spaces (" ").
+    """
+    if not items:
+        return ""
+
+    if len(items) == 1:
+        return items[0].get("text", "").strip()
+
+    parsed = []
+    for it in items:
+        text = it.get("text", "").strip()
+        if not text:
+            continue
+        bbox = it.get("bbox")
+        if bbox and len(bbox) >= 4:
+            xs = [p[0] for p in bbox]
+            ys = [p[1] for p in bbox]
+            rect = [min(xs), min(ys), max(xs), max(ys)]
+        else:
+            rect = it.get("rect", [0, 0, 0, 0])
+        h = max(rect[3] - rect[1], 1.0)
+        cy = (rect[1] + rect[3]) / 2.0
+        parsed.append({
+            "text": text,
+            "rect": rect,
+            "height": h,
+            "center_y": cy,
+            "min_x": rect[0],
+            "min_y": rect[1],
+            "max_y": rect[3],
+        })
+
+    if not parsed:
+        return ""
+
+    import numpy as np
+    median_h = float(np.median([p["height"] for p in parsed])) if parsed else 20.0
+    y_band = max(median_h * 0.5, 5.0)
+
+    # Sort items by Y band first, then by X
+    parsed.sort(key=lambda p: (round(p["min_y"] / y_band), p["min_x"]))
+
+    # Group into lines
+    lines = []
+    current_line = [parsed[0]["text"]]
+    current_min_y = parsed[0]["min_y"]
+    current_max_y = parsed[0]["max_y"]
+    current_cy = parsed[0]["center_y"]
+    current_h = parsed[0]["height"]
+
+    for p in parsed[1:]:
+        overlap_y = max(0.0, min(current_max_y, p["max_y"]) - max(current_min_y, p["min_y"]))
+        min_h = min(current_h, p["height"])
+        v_overlap_ratio = overlap_y / min_h if min_h > 0 else 0.0
+        cy_dist = abs(current_cy - p["center_y"])
+
+        if v_overlap_ratio >= 0.40 or cy_dist <= 0.45 * median_h:
+            # Same visual line: join with space
+            current_line.append(p["text"])
+            current_min_y = min(current_min_y, p["min_y"])
+            current_max_y = max(current_max_y, p["max_y"])
+            current_cy = (current_min_y + current_max_y) / 2.0
+            current_h = current_max_y - current_min_y
+        else:
+            # New visual line: start new line
+            lines.append(" ".join(current_line).strip())
+            current_line = [p["text"]]
+            current_min_y = p["min_y"]
+            current_max_y = p["max_y"]
+            current_cy = p["center_y"]
+            current_h = p["height"]
+
+    if current_line:
+        lines.append(" ".join(current_line).strip())
+
+    return "\n".join(lines)
+
+
+def is_result_sufficiently_complete(items, text, conf, mode, min_conf=0.88):
+    """
+    Conservative check to determine if an initial OCR variant is strong and complete
+    enough to safely short-circuit expensive secondary variant passes.
+    Requires:
+      1. Confidence >= min_conf
+      2. Meaningful token count (len(items) >= 2 and word_count >= 3)
+      3. Non-trivial text length
+      4. Low garbage character ratio (<= 0.25)
+      5. Mode-specific structural signals:
+         - For 'ingredient': presence of delimiters (comma, newline, semicolon) or anchor hits
+         - For 'nutrition': presence of numbers or nutrient keywords
+    """
+    if not items or conf < min_conf:
+        return False
+
+    text_clean = text.strip()
+    if len(text_clean) < 15:
+        return False
+
+    words = _word_count(text_clean)
+    if words < 3 or len(items) < 2:
+        return False
+
+    garbage = _garbage_penalty(text_clean)
+    if garbage > 0.12:
+        return False
+
+    if mode == "ingredient":
+        has_delimiters = ("," in text_clean) or ("\n" in text_clean) or (";" in text_clean)
+        has_anchor = _keyword_hits(text_clean.lower(), config.INGREDIENT_ANCHORS) > 0
+        if not (has_delimiters or has_anchor or words >= 6):
+            return False
+    elif mode == "nutrition":
+        has_numbers = _number_hits(text_clean) >= 2
+        has_keywords = _keyword_hits(text_clean.lower(), config.NUTRIENT_KEYWORDS) > 0
+        if not (has_numbers or has_keywords):
+            return False
+
+    return True
+
+
 def score_ocr_items(items, mode):
     """
     mode: "ingredient" | "nutrition" | "generic"
@@ -52,7 +175,7 @@ def score_ocr_items(items, mode):
     if not items:
         return 0.0, "", 0.0
 
-    joined_text = " ".join(i["text"] for i in items)
+    joined_text = join_ocr_items_with_line_boundaries(items)
     text_lower = joined_text.lower()
     avg_conf = sum(i["confidence"] for i in items) / len(items)
 
@@ -136,8 +259,8 @@ def run_variant_ocr(variants, mode="generic"):
         best_score = score
         best_variant = "original"
         
-        # If the confidence is high, short-circuit
-        if conf >= short_circuit_conf:
+        # Phase 10D: Conservative short-circuit to skip redundant secondary variants
+        if is_result_sufficiently_complete(items, text, conf, mode, min_conf=short_circuit_conf):
             return {
                 "best_variant": "original",
                 "best_score": score,

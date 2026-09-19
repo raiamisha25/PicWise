@@ -141,6 +141,20 @@ class PersonalCareKnowledgeBase:
                 self._canonical_index[canon_key] = features
                 self._vocab_names.append(name)
 
+            # Phase 10D: Index parenthetical INCI aliases, e.g. "Aqua (Water)" -> "Aqua", "Water"
+            paren_match = re.match(r"^(.*?)\s*\((.*?)\)$", name)
+            if paren_match:
+                prefix = paren_match.group(1).strip()
+                inner = paren_match.group(2).strip()
+                prefix_key = normalize_lookup_key(prefix)
+                inner_key = normalize_lookup_key(inner)
+                if prefix_key and prefix_key not in self._canonical_index and prefix_key not in self._alternate_index:
+                    self._alternate_index[prefix_key] = features
+                    self._vocab_names.append(prefix)
+                if inner_key and inner_key not in self._canonical_index and inner_key not in self._alternate_index:
+                    self._alternate_index[inner_key] = features
+                    self._vocab_names.append(inner)
+
             alt_raw = row.get("Packaging Names / Alternate Names")
             if alt_raw and str(alt_raw).strip() != "No Alternate Names":
                 for alt_item in str(alt_raw).split(";"):

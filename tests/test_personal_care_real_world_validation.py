@@ -201,12 +201,13 @@ class TestIngredientRecognitionRobustness(unittest.TestCase):
 
     def test_knowledge_base_unrepresented_alias_limitation(self):
         """
-        Documents DATA/KNOWLEDGE-BASE LIMITATION:
-        Parenthetical INCI entries like 'Aqua (Water)' only index 'Water' in the alternate names column;
-        the INCI prefix 'Aqua' alone is not in the knowledge base alternate names.
+        Documents Phase 10D REMEDIATION of previously unrepresented alias limitation:
+        Parenthetical INCI entries like 'Aqua (Water)' now index both prefix 'Aqua' and inner 'Water';
+        the INCI prefix 'Aqua' alone successfully resolves in the knowledge base.
         """
         feat = self.kb.lookup("Aqua")
-        self.assertIsNone(feat, "Aqua alone is unrepresented in the KB alternate names column")
+        self.assertIsNotNone(feat, "Aqua alone is now successfully resolved via Phase 10D parenthetical alias coverage")
+        self.assertEqual(feat.ingredient_name, "Aqua (Water)")
 
     def test_ocr_spelling_distortion_handling(self):
         """Genuinely distorted OCR text must NOT match erroneously and must NOT be classified as Safe."""

@@ -45,9 +45,10 @@ class PersonalCareAnalysisResult:
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     presentation: Dict[str, Any] = field(default_factory=dict)
+    ocr_quality_warning: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "category": self.category,
             "success": self.success,
             "ocr": self.ocr,
@@ -56,3 +57,6 @@ class PersonalCareAnalysisResult:
             "warnings": self.warnings,
             "presentation": self.presentation,
         }
+        if self.ocr_quality_warning is not None:
+            d["ocr_quality_warning"] = self.ocr_quality_warning
+        return d
