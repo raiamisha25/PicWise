@@ -1,3 +1,9 @@
+import os
+
+# Constrain native OpenMP and MKL thread pools for local runtime stability
+os.environ.setdefault("OMP_NUM_THREADS", "2")
+os.environ.setdefault("MKL_NUM_THREADS", "2")
+
 from flask import Flask, render_template, jsonify
 
 from backend.routes.api import api_bp
@@ -17,6 +23,14 @@ def create_app():
             "error": "Uploaded image file exceeds the maximum allowed size of 16MB.",
             "success": False,
         }), 413
+
+    @app.get("/health")
+    def health():
+        return jsonify({
+            "status": "healthy",
+            "app": "PicWise",
+            "version": "1.0.0",
+        }), 200
 
     @app.get("/")
     def home():

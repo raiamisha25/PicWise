@@ -10,6 +10,10 @@ file talks to OpenCV/PaddleOCR directly - it is pure data + simple helpers.
 
 import os
 
+# Constrain native OpenMP and MKL thread pools for local runtime stability
+os.environ.setdefault("OMP_NUM_THREADS", "2")
+os.environ.setdefault("MKL_NUM_THREADS", "2")
+
 # --------------------------------------------------------------------------
 # PATHS
 # --------------------------------------------------------------------------

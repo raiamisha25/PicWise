@@ -55,8 +55,7 @@ def analyze_food_endpoint():
     except Exception as exc:
         current_app.logger.error(f"Unexpected error in /api/food/analyze: {exc}", exc_info=True)
         return jsonify({
-            "error": "An unexpected server error occurred while analyzing the food product.",
-            "errors": [str(exc)],
+            "error": "An unexpected server error occurred. Please try again.",
             "success": False,
         }), 500
 
@@ -104,8 +103,7 @@ def analyze_personal_care_endpoint():
     except Exception as exc:
         current_app.logger.error(f"Unexpected error in /api/personal-care/analyze: {exc}", exc_info=True)
         return jsonify({
-            "error": "An unexpected server error occurred while analyzing the personal care product.",
-            "errors": [str(exc)],
+            "error": "An unexpected server error occurred. Please try again.",
             "success": False,
         }), 500
 
@@ -133,15 +131,28 @@ def analyze():
     if not image_bytes or len(image_bytes) == 0:
         return jsonify({"error": "Uploaded image file is empty."}), 400
 
+    if len(image_bytes) > MAX_IMAGE_SIZE_BYTES:
+        return jsonify({
+            "error": "Uploaded image file exceeds the maximum allowed size of 16MB.",
+            "success": False,
+        }), 413
+
     try:
         pil_img = Image.open(io.BytesIO(image_bytes))
         pil_img.verify()
     except Exception:
         return jsonify({"error": "Invalid or corrupt image file."}), 400
 
-    knowledge_base = current_app.config.get("KNOWLEDGE_BASE")
-    result = analyze_product_image(image_bytes, knowledge_base, category=category)
-    return jsonify(result)
+    try:
+        knowledge_base = current_app.config.get("KNOWLEDGE_BASE")
+        result = analyze_product_image(image_bytes, knowledge_base, category=category)
+        return jsonify(result), 200
+    except Exception as exc:
+        current_app.logger.error(f"Unexpected error in /api/analyze: {exc}", exc_info=True)
+        return jsonify({
+            "error": "An unexpected server error occurred. Please try again.",
+            "success": False,
+        }), 500
 
 
 def _is_allowed_image(mimetype, filename):
