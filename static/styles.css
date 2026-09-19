@@ -1553,3 +1553,9 @@ a:focus-visible, button:focus-visible, input:focus-visible {
     align-items: center;
   }
 }
+
+@media (max-width: 600px) {
+  .category-toggle-container {
+    grid-template-columns: 1fr;
+  }
+}

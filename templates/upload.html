@@ -12,8 +12,8 @@
     <div class="upload-panel card">
       <form id="uploadForm" class="upload-form">
         <div class="category-selection-group">
-          <span class="category-group-label">Select Product Category <span class="required-star">*</span></span>
-          <div class="category-toggle-container">
+          <span id="categoryGroupLabel" class="category-group-label">Select Product Category <span class="required-star">*</span></span>
+          <div class="category-toggle-container" role="radiogroup" aria-labelledby="categoryGroupLabel">
             <label class="category-card" for="catFood">
               <input type="radio" id="catFood" name="category" value="food" checked>
               <div class="category-card-inner">

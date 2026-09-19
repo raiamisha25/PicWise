@@ -50,10 +50,20 @@ const pcIrritationCount = document.querySelector("#pcIrritationCount");
 const pcIrritationIngredientsList = document.querySelector("#pcIrritationIngredientsList");
 
 let selectedFile = null;
+let isAnalyzing = false;
 
 // Event Listeners
 input.addEventListener("change", () => {
   setSelectedFile(input.files[0]);
+});
+
+// Category Switch: Immediately clear stale results and errors
+const categoryRadios = form.querySelectorAll("input[name='category']");
+categoryRadios.forEach((radio) => {
+  radio.addEventListener("change", () => {
+    resetResults();
+    fileError.textContent = "";
+  });
 });
 
 dropZone.addEventListener("dragover", (event) => {
@@ -86,6 +96,10 @@ removeImage.addEventListener("click", () => {
 // Form Submission
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (isAnalyzing) {
+    return;
+  }
+
   if (!selectedFile) {
     fileError.textContent = "Please select an image before analyzing.";
     return;
@@ -133,7 +147,8 @@ form.addEventListener("submit", async (event) => {
 
     resultsPanel.classList.remove("hidden");
   } catch (error) {
-    fileError.textContent = error.message || "An error occurred during analysis.";
+    const networkMsg = "Unable to connect to the server. Please check that PicWise is running and try again.";
+    fileError.textContent = (error.message === "Failed to fetch") ? networkMsg : (error.message || "An error occurred during analysis.");
   } finally {
     setLoadingState(false);
   }
@@ -144,6 +159,15 @@ function setSelectedFile(file) {
   resetResults();
 
   if (!file) {
+    return;
+  }
+
+  if (file.size === 0) {
+    selectedFile = null;
+    input.value = "";
+    previewWrap.classList.add("hidden");
+    analyzeButton.disabled = true;
+    fileError.textContent = "Uploaded image file is empty.";
     return;
   }
 
@@ -172,6 +196,7 @@ function setSelectedFile(file) {
 }
 
 function setLoadingState(isLoading) {
+  isAnalyzing = isLoading;
   if (isLoading) {
     loadingState.classList.remove("hidden");
     analyzeButton.disabled = true;
@@ -187,6 +212,14 @@ function resetResults() {
   if (personalCareResultsContainer) personalCareResultsContainer.classList.add("hidden");
   if (foodWarningsBanner) foodWarningsBanner.classList.add("hidden");
   if (pcWarningsBanner) pcWarningsBanner.classList.add("hidden");
+  if (foodWarningsList) foodWarningsList.innerHTML = "";
+  if (pcWarningsList) pcWarningsList.innerHTML = "";
+  if (foodSafetyIngredientsList) foodSafetyIngredientsList.innerHTML = "";
+  if (nutritionNutrientsList) nutritionNutrientsList.innerHTML = "";
+  if (allergyDetectedList) allergyDetectedList.innerHTML = "";
+  if (pcSafetyIngredientsList) pcSafetyIngredientsList.innerHTML = "";
+  if (pcAllergyIngredientsList) pcAllergyIngredientsList.innerHTML = "";
+  if (pcIrritationIngredientsList) pcIrritationIngredientsList.innerHTML = "";
 }
 
 /* ==========================================================================
