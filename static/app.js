@@ -33,6 +33,22 @@ const allergyStatusBadge = document.querySelector("#allergyStatusBadge");
 const allergyDetectedList = document.querySelector("#allergyDetectedList");
 const allergyEmptyNotice = document.querySelector("#allergyEmptyNotice");
 
+// Personal Care-specific result elements (Phase 10B)
+const pcWarningsBanner = document.querySelector("#pcWarningsBanner");
+const pcWarningsList = document.querySelector("#pcWarningsList");
+
+const pcSafetyStatusBadge = document.querySelector("#pcSafetyStatusBadge");
+const pcSafetyCount = document.querySelector("#pcSafetyCount");
+const pcSafetyIngredientsList = document.querySelector("#pcSafetyIngredientsList");
+
+const pcAllergyStatusBadge = document.querySelector("#pcAllergyStatusBadge");
+const pcAllergyCount = document.querySelector("#pcAllergyCount");
+const pcAllergyIngredientsList = document.querySelector("#pcAllergyIngredientsList");
+
+const pcIrritationStatusBadge = document.querySelector("#pcIrritationStatusBadge");
+const pcIrritationCount = document.querySelector("#pcIrritationCount");
+const pcIrritationIngredientsList = document.querySelector("#pcIrritationIngredientsList");
+
 let selectedFile = null;
 
 // Event Listeners
@@ -91,7 +107,7 @@ form.addEventListener("submit", async (event) => {
   fileError.textContent = "";
 
   try {
-    const endpoint = selectedCategory === "food" ? "/api/food/analyze" : "/api/analyze";
+    const endpoint = selectedCategory === "food" ? "/api/food/analyze" : "/api/personal-care/analyze";
     const response = await fetch(endpoint, {
       method: "POST",
       body: formData,
@@ -169,6 +185,8 @@ function resetResults() {
   resultsPanel.classList.add("hidden");
   if (foodResultsContainer) foodResultsContainer.classList.add("hidden");
   if (personalCareResultsContainer) personalCareResultsContainer.classList.add("hidden");
+  if (foodWarningsBanner) foodWarningsBanner.classList.add("hidden");
+  if (pcWarningsBanner) pcWarningsBanner.classList.add("hidden");
 }
 
 /* ==========================================================================
@@ -357,85 +375,145 @@ function renderFoodWarnings(warnings) {
 }
 
 /* ==========================================================================
-   PERSONAL CARE RENDERING (Backward Compatibility)
+   PERSONAL CARE ANALYSIS RENDERING (Phase 10B)
+   Consumes backend presentation object strictly across 3 independent dimensions.
+   NO overall product health score, NO overall product color.
    ========================================================================== */
 function renderPersonalCareAnalysis(data) {
   if (foodResultsContainer) foodResultsContainer.classList.add("hidden");
   if (personalCareResultsContainer) personalCareResultsContainer.classList.remove("hidden");
 
-  document.querySelector("#productName").textContent = valueOrUnavailable(data.product?.name);
-  document.querySelector("#productBrand").textContent = valueOrUnavailable(data.product?.brand);
-  document.querySelector("#productDomain").textContent = formatDomain(data.product?.domain);
+  const pres = data.presentation || {};
+  const ingredients = data.personal_care?.ingredients || [];
+  const recognizedCount = data.personal_care?.recognized_ingredients ?? ingredients.filter((i) => i.status === "success").length;
+  const totalCount = data.personal_care?.total_ingredients ?? ingredients.length;
+  const countDisplay = `${recognizedCount} of ${totalCount}`;
 
-  renderList("#ingredientsList", data.ingredients, renderIngredient);
-  renderList("#personalCareList", data.personalCare, renderPersonalCare);
-  renderList("#warningsList", data.warnings, renderWarning);
+  // 1. Personal Care Safety Card
+  renderPersonalCareDimensionCard({
+    badgeElem: pcSafetyStatusBadge,
+    countElem: pcSafetyCount,
+    listElem: pcSafetyIngredientsList,
+    dimPres: pres.personal_care_safety,
+    dimensionKey: "safety",
+    ingredients: ingredients,
+    countText: countDisplay,
+  });
+
+  // 2. Personal Care Allergy Card
+  renderPersonalCareDimensionCard({
+    badgeElem: pcAllergyStatusBadge,
+    countElem: pcAllergyCount,
+    listElem: pcAllergyIngredientsList,
+    dimPres: pres.allergy,
+    dimensionKey: "allergy",
+    ingredients: ingredients,
+    countText: countDisplay,
+  });
+
+  // 3. Personal Care Irritation Card
+  renderPersonalCareDimensionCard({
+    badgeElem: pcIrritationStatusBadge,
+    countElem: pcIrritationCount,
+    listElem: pcIrritationIngredientsList,
+    dimPres: pres.irritation,
+    dimensionKey: "irritation",
+    ingredients: ingredients,
+    countText: countDisplay,
+  });
+
+  // 4. Warnings / Notices
+  renderPersonalCareWarnings(data.warnings);
 }
 
-function renderList(selector, items, renderer) {
-  const container = document.querySelector(selector);
-  if (!container) return;
-  container.innerHTML = "";
+function renderPersonalCareDimensionCard({
+  badgeElem,
+  countElem,
+  listElem,
+  dimPres,
+  dimensionKey,
+  ingredients,
+  countText,
+}) {
+  dimPres = dimPres || {};
+  const status = dimPres.color || dimPres.status || "unavailable";
+  const label = dimPres.label || "Unavailable";
 
-  if (!items || items.length === 0) {
-    container.appendChild(emptyItem());
+  if (badgeElem) {
+    badgeElem.className = `status-pill ${escapeHtml(status)}`;
+    badgeElem.textContent = label;
+  }
+
+  if (countElem) {
+    countElem.textContent = countText;
+  }
+
+  if (!listElem) return;
+  listElem.innerHTML = "";
+
+  if (!ingredients || ingredients.length === 0) {
+    const emptyNotice = document.createElement("p");
+    emptyNotice.className = "allergy-empty-notice";
+    emptyNotice.textContent = "No ingredients detected by OCR.";
+    listElem.appendChild(emptyNotice);
     return;
   }
 
-  items.forEach((item) => container.appendChild(renderer(item)));
+  ingredients.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "ingredient-badge-row";
+
+    const name = item.matched_name || item.raw_text || unavailable;
+    const isSuccess = item.status === "success";
+
+    let itemStatus = "unavailable";
+    let itemLabel = "Unavailable";
+    let confStr = "";
+
+    if (isSuccess) {
+      const dimData = item[dimensionKey] || {};
+      const itemPres = (item.presentation && item.presentation[dimensionKey]) || {};
+      itemStatus = itemPres.color || itemPres.status || "unavailable";
+      itemLabel = itemPres.label || dimData.risk_class || "Assessed";
+      if (Number.isFinite(dimData.confidence)) {
+        confStr = `Confidence: ${Math.round(dimData.confidence * 100)}%`;
+      }
+    } else {
+      itemStatus = "unavailable";
+      if (item.status === "ingredient_not_recognized") {
+        itemLabel = "Not Recognized";
+        confStr = "Unrecognized ingredient";
+      } else {
+        itemLabel = "Unavailable";
+        confStr = item.reason || "Analysis unavailable";
+      }
+    }
+
+    row.innerHTML = `
+      <div class="ingredient-info">
+        <span class="ingredient-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+        ${confStr ? `<span class="ingredient-confidence">${escapeHtml(confStr)}</span>` : ""}
+      </div>
+      <span class="status-pill ${escapeHtml(itemStatus)}">${escapeHtml(itemLabel)}</span>
+    `;
+    listElem.appendChild(row);
+  });
 }
 
-function renderIngredient(item) {
-  const pairs = [
-    ["Matched", item.matched ? "Yes" : "No"],
-    ["Confidence", Number.isFinite(item.confidence) ? item.confidence.toFixed(2) : unavailable],
-    ["Safety level", item.safetyLevel],
-    ["Allergy risk", item.allergyRisk],
-  ];
-  return resultItem(valueOrUnavailable(item.name), pairs);
-}
-
-function renderPersonalCare(item) {
-  return resultItem(
-    valueOrUnavailable(item.ingredient),
-    [
-      ["Function", item.function],
-      ["Safety level", item.safetyLevel],
-      ["Irritation risk", item.irritationRisk],
-    ],
-  );
-}
-
-function renderWarning(text) {
-  return resultItem("Warning", [["Message", text]]);
-}
-
-function resultItem(title, pairs) {
-  const wrapper = document.createElement("article");
-  wrapper.className = "result-item";
-  wrapper.innerHTML = `
-    <h4>${escapeHtml(title)}</h4>
-    <div class="detail-grid">
-      ${pairs.map(([label, value]) => `
-        <div>
-          <span class="detail-label">${escapeHtml(label)}</span>
-          <span class="detail-value">${escapeHtml(valueOrUnavailable(value))}</span>
-        </div>
-      `).join("")}
-    </div>
-  `;
-  return wrapper;
-}
-
-function emptyItem() {
-  return resultItem(unavailable, [["Status", unavailable]]);
-}
-
-function formatDomain(domain) {
-  if (domain === "food") return "Food";
-  if (domain === "personal_care") return "Personal Care";
-  if (domain === "unknown") return "Unknown";
-  return unavailable;
+function renderPersonalCareWarnings(warnings) {
+  if (Array.isArray(warnings) && warnings.length > 0) {
+    if (pcWarningsList) {
+      pcWarningsList.innerHTML = "";
+      warnings.forEach((warn) => {
+        const li = document.createElement("li");
+        li.textContent = warn;
+        pcWarningsList.appendChild(li);
+      });
+    }
+    if (pcWarningsBanner) pcWarningsBanner.classList.remove("hidden");
+  } else {
+    if (pcWarningsBanner) pcWarningsBanner.classList.add("hidden");
+  }
 }
 
 function formatNutrientName(key) {

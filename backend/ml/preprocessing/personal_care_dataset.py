@@ -146,6 +146,13 @@ def load_personal_care_dataset(path: Optional[str] = None) -> pd.DataFrame:
     return df
 
 
+def tokenize_product_categories(text: str) -> List[str]:
+    """Tokenizes comma-separated product category strings."""
+    if not text or not isinstance(text, str):
+        return []
+    return [item.strip().lower() for item in str(text).split(",") if item.strip()]
+
+
 def build_feature_pipeline() -> ColumnTransformer:
     """
     Builds the ColumnTransformer for the selected feature representation:
@@ -168,7 +175,7 @@ def build_feature_pipeline() -> ColumnTransformer:
     )
 
     prod_cat_vectorizer = CountVectorizer(
-        tokenizer=lambda x: [item.strip().lower() for item in x.split(",") if item.strip()],
+        tokenizer=tokenize_product_categories,
         token_pattern=None,
         binary=True,
     )

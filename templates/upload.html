@@ -188,43 +188,109 @@
       </div>
     </div>
 
-    <!-- Personal Care Results Container (Preserved for backwards compatibility) -->
+    <!-- Personal Care Results Container (Phase 10B) -->
     <div id="personalCareResultsContainer" class="hidden">
       <div class="section-title-row results-heading">
         <div>
-          <h2>Product Summary</h2>
-          <p>Missing fields are shown as Information not available.</p>
+          <h2>Personal Care Analysis</h2>
+          <p>Independent assessments across Safety, Allergy Risk, and Irritation Risk.</p>
         </div>
       </div>
 
-      <div class="summary-grid">
-        <div>
-          <span>Name</span>
-          <strong id="productName">Information not available</strong>
+      <!-- Personal Care Warnings Banner -->
+      <div id="pcWarningsBanner" class="warning-banner hidden" role="alert">
+        <div class="warning-banner-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
         </div>
-        <div>
-          <span>Brand</span>
-          <strong id="productBrand">Information not available</strong>
-        </div>
-        <div>
-          <span>Domain</span>
-          <strong id="productDomain">Information not available</strong>
+        <div class="warning-banner-content">
+          <strong>Notices & Warnings</strong>
+          <ul id="pcWarningsList"></ul>
         </div>
       </div>
 
-      <div class="result-section">
-        <h3>Ingredients</h3>
-        <div id="ingredientsList" class="result-list"></div>
-      </div>
+      <!-- Three Independent Dimension Cards Grid -->
+      <div class="food-cards-grid">
+        <!-- 1. Personal Care Safety Card -->
+        <div id="personalCareSafetyCard" class="dimension-card">
+          <div class="card-header-row">
+            <div class="dimension-title-group">
+              <span class="dimension-icon">🧴</span>
+              <div>
+                <h3 class="dimension-title">Personal Care Safety</h3>
+                <span class="dimension-subtitle">ML-based ingredient safety</span>
+              </div>
+            </div>
+            <span id="pcSafetyStatusBadge" class="status-pill unavailable">Unavailable</span>
+          </div>
 
-      <div class="result-section">
-        <h3>Personal Care Details</h3>
-        <div id="personalCareList" class="result-list"></div>
-      </div>
+          <div class="dimension-body">
+            <div class="meta-stat-row">
+              <span class="meta-label">Ingredients Assessed:</span>
+              <strong id="pcSafetyCount" class="meta-value">0</strong>
+            </div>
 
-      <div class="result-section">
-        <h3>Warnings</h3>
-        <div id="warningsList" class="result-list"></div>
+            <div class="ingredient-breakdown">
+              <h4 class="breakdown-title">Ingredient Safety Breakdown</h4>
+              <div id="pcSafetyIngredientsList" class="ingredient-badges-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Allergy Risk Card -->
+        <div id="personalCareAllergyCard" class="dimension-card">
+          <div class="card-header-row">
+            <div class="dimension-title-group">
+              <span class="dimension-icon">⚠️</span>
+              <div>
+                <h3 class="dimension-title">Allergy Risk</h3>
+                <span class="dimension-subtitle">ML-based sensitization potential</span>
+              </div>
+            </div>
+            <span id="pcAllergyStatusBadge" class="status-pill unavailable">Unavailable</span>
+          </div>
+
+          <div class="dimension-body">
+            <div class="meta-stat-row">
+              <span class="meta-label">Ingredients Assessed:</span>
+              <strong id="pcAllergyCount" class="meta-value">0</strong>
+            </div>
+
+            <div class="ingredient-breakdown">
+              <h4 class="breakdown-title">Ingredient Allergy Breakdown</h4>
+              <div id="pcAllergyIngredientsList" class="ingredient-badges-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Irritation Risk Card -->
+        <div id="personalCareIrritationCard" class="dimension-card">
+          <div class="card-header-row">
+            <div class="dimension-title-group">
+              <span class="dimension-icon">🔬</span>
+              <div>
+                <h3 class="dimension-title">Irritation Risk</h3>
+                <span class="dimension-subtitle">ML-based topical irritation potential</span>
+              </div>
+            </div>
+            <span id="pcIrritationStatusBadge" class="status-pill unavailable">Unavailable</span>
+          </div>
+
+          <div class="dimension-body">
+            <div class="meta-stat-row">
+              <span class="meta-label">Ingredients Assessed:</span>
+              <strong id="pcIrritationCount" class="meta-value">0</strong>
+            </div>
+
+            <div class="ingredient-breakdown">
+              <h4 class="breakdown-title">Ingredient Irritation Breakdown</h4>
+              <div id="pcIrritationIngredientsList" class="ingredient-badges-list"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
