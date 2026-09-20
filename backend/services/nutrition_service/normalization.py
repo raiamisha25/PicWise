@@ -444,6 +444,23 @@ def _parse_val_unit(raw_val: Any, explicit_unit: Optional[str] = None) -> Tuple[
         unit = explicit_unit or re.sub(r"[0-9\.\s]", "", val_str)
         return 0.0, unit, True, False
 
+    # Check for dual energy units (kcal and kj), e.g. "110 kcal / 460 kj", "460 kj / 110 kcal", "110 kcal (460 kj)"
+    kcal_match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*kcal\b", val_str)
+    if kcal_match:
+        try:
+            num = float(kcal_match.group(1))
+            return num, "kcal", (num == 0.0), False
+        except ValueError:
+            pass
+
+    kj_match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*kj\b", val_str)
+    if kj_match:
+        try:
+            num = float(kj_match.group(1))
+            return num, "kj", (num == 0.0), False
+        except ValueError:
+            pass
+
     # Extract numeric and unit
     m = re.match(r"^([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z%]*)$", val_str)
     if m:
@@ -452,6 +469,16 @@ def _parse_val_unit(raw_val: Any, explicit_unit: Optional[str] = None) -> Tuple[
             unit = explicit_unit or m.group(2)
             if num < 0:
                 return None, unit, False, True
+            return num, unit, (num == 0.0), False
+        except ValueError:
+            pass
+
+    # Fallback: slash-separated values without unit, e.g. '110 / 460' or '110/460'
+    m_slash = re.match(r"^([0-9]+(?:\.[0-9]+)?)\s*/\s*([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z%]*)$", val_str)
+    if m_slash:
+        try:
+            num = float(m_slash.group(1))
+            unit = explicit_unit or m_slash.group(3)
             return num, unit, (num == 0.0), False
         except ValueError:
             pass

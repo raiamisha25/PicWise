@@ -459,9 +459,9 @@ class TestFoodAnalysisPipeline(unittest.TestCase):
         # Allergy component resolves active lookup
         self.assertIsNotNone(result.allergy)
         self.assertEqual(result.allergy["status"], "success")
-        self.assertEqual(result.allergy["product_risk_level"], "No Risk")
-        self.assertEqual(result.allergy["product_ui_label"], "Allergen-Free")
-        self.assertEqual(result.allergy["presentation_status"], "green")
+        self.assertEqual(result.allergy["product_risk_level"], "Medium")
+        self.assertEqual(result.allergy["product_ui_label"], "Moderate Allergy Risk")
+        self.assertEqual(result.allergy["presentation_status"], "orange")
 
         # Phase 9H: Presentation structure verification
         self.assertIsNotNone(result.presentation)
@@ -493,16 +493,16 @@ class TestFoodAnalysisPipeline(unittest.TestCase):
         self.assertIn("nutrition", data)
         self.assertIn("allergy", data)
         self.assertEqual(data["allergy"]["status"], "success")
-        self.assertEqual(data["allergy"]["product_risk_level"], "No Risk")
-        self.assertEqual(data["allergy"]["product_ui_label"], "Allergen-Free")
-        self.assertEqual(data["allergy"]["presentation_status"], "green")
+        self.assertEqual(data["allergy"]["product_risk_level"], "Medium")
+        self.assertEqual(data["allergy"]["product_ui_label"], "Moderate Allergy Risk")
+        self.assertEqual(data["allergy"]["presentation_status"], "orange")
 
         # Phase 9H: API response presentation verification
         self.assertIn("presentation", data)
         self.assertIn("food_safety", data["presentation"])
         self.assertIn("allergy", data["presentation"])
         self.assertIn("nutrition", data["presentation"])
-        self.assertEqual(data["presentation"]["allergy"]["status"], "green")
+        self.assertEqual(data["presentation"]["allergy"]["status"], "orange")
         self.assertNotIn("overall_status", data["presentation"])
         self.assertNotIn("overall_color", data["presentation"])
         self.assertNotIn("overall_score", data["presentation"])

@@ -259,6 +259,15 @@ class KnowledgeBase:
         if score < threshold:
             return {"ocr_text": ocr_text, "matched_name": None, "similarity": round(float(score), 1)}
 
+        # Length ratio check to prevent long non-ingredient sentences/phrases from matching short ingredients
+        # e.g., "maison de parfum rose & oud eau de parfum 100 ml - 3.4 fl. oz" matching "parfum (fragrance)"
+        if canonical and 'match_text' in locals() and match_text:
+            len_query = len(query)
+            len_target = len(match_text)
+            len_ratio = min(len_query, len_target) / max(len_query, len_target)
+            if len_ratio < 0.4 and score < 95.0:
+                return {"ocr_text": ocr_text, "matched_name": None, "similarity": round(float(score), 1)}
+
         return {
             "ocr_text": ocr_text,
             "matched_name": canonical,

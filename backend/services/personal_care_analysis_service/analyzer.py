@@ -92,32 +92,33 @@ def analyze_personal_care(
     all_warnings: List[str] = []
     raw_ingredients = ocr_output.get("ingredients", [])
 
+    # Phase 10D / Phase 14: Conservative Image Quality Advisory
+    img_quality = ocr_output.get("image_quality") if ocr_output else None
+    raw_text_dict = ocr_output.get("raw_text", {}) if ocr_output else {}
+    all_text = raw_text_dict.get("all_text", "").strip() if raw_text_dict else ""
+    ing_region = (ocr_output.get("ingredients_region") or {}) if ocr_output else {}
+    line_count = ing_region.get("line_count", 0) if ing_region else 0
+    anchor = ing_region.get("anchor") if ing_region else None
+
+    lap_var = img_quality.get("laplacian_variance") if img_quality else None
+    if lap_var is None and img_quality:
+        lap_var = img_quality.get("laplacian_var")
+
+    is_degraded = (
+        (img_quality and (img_quality.get("is_blurry") or img_quality.get("is_too_dark")))
+        or (len(all_text) > 0 and lap_var is not None and lap_var < 150.0)
+        or (line_count <= 1 and anchor is None and len(all_text) > 0 and not raw_ingredients)
+        or (img_quality and img_quality.get("contrast_std", 100.0) < 25.0 and not raw_ingredients)
+    )
+
+    ocr_quality_advisory = None
+    if is_degraded:
+        ocr_quality_advisory = "OCR quality may be unreliable: image appears degraded or blurred. Please capture a clearer, well-lit photo of the ingredient list."
+        all_warnings.append(ocr_quality_advisory)
+
     if not raw_ingredients:
         no_ing_warning = "No ingredients detected in OCR output."
         all_warnings.append(no_ing_warning)
-
-        # Phase 10D: Conservative Image Quality Advisory
-        ocr_quality_advisory = None
-        img_quality = ocr_output.get("image_quality") if ocr_output else None
-        raw_text_dict = ocr_output.get("raw_text", {}) if ocr_output else {}
-        all_text = raw_text_dict.get("all_text", "").strip() if raw_text_dict else ""
-        ing_region = (ocr_output.get("ingredients_region") or {}) if ocr_output else {}
-        line_count = ing_region.get("line_count", 0)
-
-        lap_var = img_quality.get("laplacian_variance") if img_quality else None
-        if lap_var is None and img_quality:
-            lap_var = img_quality.get("laplacian_var")
-
-        is_degraded = (
-            (img_quality and (img_quality.get("is_blurry") or img_quality.get("is_too_dark")))
-            or (len(all_text) > 0 and lap_var is not None and lap_var < 150.0)
-            or (line_count <= 1 and not ing_region.get("anchor") and len(all_text) > 0)
-            or (img_quality and img_quality.get("contrast_std", 100.0) < 25.0)
-        )
-
-        if is_degraded:
-            ocr_quality_advisory = "OCR quality may be unreliable: image appears degraded or blurred. Please capture a clearer, well-lit photo of the ingredient list."
-            all_warnings.append(ocr_quality_advisory)
 
         unav_pres = map_personal_care_presentation(
             safety_status="unavailable",
@@ -248,10 +249,17 @@ def analyze_personal_care(
             )
             ingredient_analyses.append(ing_record.to_dict())
 
+    recognized_count = sum(1 for ing in ingredient_analyses if ing.get("status") == "success")
+
     # 5. Conservative Product-Level Aggregation (Worst-Case per Dimension)
-    worst_safety, safety_status = aggregate_product_dimension(ingredient_analyses, "safety")
-    worst_allergy, allergy_status = aggregate_product_dimension(ingredient_analyses, "allergy")
-    worst_irritation, irritation_status = aggregate_product_dimension(ingredient_analyses, "irritation")
+    if is_degraded or recognized_count == 0:
+        worst_safety, safety_status = None, "unavailable"
+        worst_allergy, allergy_status = None, "unavailable"
+        worst_irritation, irritation_status = None, "unavailable"
+    else:
+        worst_safety, safety_status = aggregate_product_dimension(ingredient_analyses, "safety")
+        worst_allergy, allergy_status = aggregate_product_dimension(ingredient_analyses, "allergy")
+        worst_irritation, irritation_status = aggregate_product_dimension(ingredient_analyses, "irritation")
 
     # 6. Presentation Status Mapping across independent dimensions
     presentation_obj = map_personal_care_presentation(
@@ -263,8 +271,6 @@ def analyze_personal_care(
         irritation_status=irritation_status,
     )
     presentation_dict = presentation_obj.to_dict()
-
-    recognized_count = sum(1 for ing in ingredient_analyses if ing.get("status") == "success")
 
     personal_care_summary = {
         "safety": {
@@ -286,29 +292,6 @@ def analyze_personal_care(
         "total_ingredients": len(ingredient_analyses),
         "recognized_ingredients": recognized_count,
     }
-
-    ocr_quality_advisory = None
-    if recognized_count == 0:
-        img_quality = ocr_output.get("image_quality") if ocr_output else None
-        ing_region = ocr_output.get("ingredients_region") if ocr_output else {}
-        line_count = ing_region.get("line_count", 0) if ing_region else 0
-        anchor = ing_region.get("anchor") if ing_region else None
-        raw_text_dict = ocr_output.get("raw_text", {}) if ocr_output else {}
-        all_text = raw_text_dict.get("all_text", "").strip() if raw_text_dict else ""
-        lap_var = img_quality.get("laplacian_variance") if img_quality else None
-        if lap_var is None and img_quality:
-            lap_var = img_quality.get("laplacian_var")
-
-        is_degraded = (
-            (img_quality and (img_quality.get("is_blurry") or img_quality.get("is_too_dark")))
-            or (len(all_text) > 0 and lap_var is not None and lap_var < 150.0)
-            or (line_count <= 1 and anchor is None and len(all_text) > 0)
-            or (img_quality and img_quality.get("contrast_std", 100.0) < 25.0)
-        )
-        if is_degraded:
-            ocr_quality_advisory = "OCR quality may be unreliable: image appears degraded or blurred. Please capture a clearer, well-lit photo of the ingredient list."
-            if ocr_quality_advisory not in all_warnings:
-                all_warnings.append(ocr_quality_advisory)
 
     return PersonalCareAnalysisResult(
         category="personal_care",

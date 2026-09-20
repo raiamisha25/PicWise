@@ -170,10 +170,15 @@ def parse_nutrition(raw_text, ocr_dict=None):
         row_data = {}
         for val_cell in r[1:]:
             val_text = val_cell["text"]
-            match = VALUE_UNIT_PATTERN.search(val_text)
-            if not match:
-                continue
-            value_str, unit = match.group(1), match.group(2).lower()
+            # If dual units (e.g. kJ and kcal), prefer kcal
+            kcal_m = re.search(r"(\d+(?:\.\d+)?)\s*kcal\b", val_text, re.IGNORECASE)
+            if kcal_m:
+                value_str, unit = kcal_m.group(1), "kcal"
+            else:
+                match = VALUE_UNIT_PATTERN.search(val_text)
+                if not match:
+                    continue
+                value_str, unit = match.group(1), match.group(2).lower()
             try:
                 val = float(value_str)
             except ValueError:
@@ -231,11 +236,14 @@ def _parse_nutrition_string_fallback(raw_text):
         if key is None or key in result:
             continue
 
-        match = VALUE_UNIT_PATTERN.search(line)
-        if not match:
-            continue
-
-        value_str, unit = match.group(1), match.group(2).lower()
+        kcal_m = re.search(r"(\d+(?:\.\d+)?)\s*kcal\b", line, re.IGNORECASE)
+        if kcal_m:
+            value_str, unit = kcal_m.group(1), "kcal"
+        else:
+            match = VALUE_UNIT_PATTERN.search(line)
+            if not match:
+                continue
+            value_str, unit = match.group(1), match.group(2).lower()
         try:
             value = float(value_str)
         except ValueError:

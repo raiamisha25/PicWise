@@ -20,29 +20,40 @@ class IngredientCorrector:
 
     def clean_text(self, text):
         """
-        Normalizes OCR text, removes leading headings, and cleans stray characters.
+        Normalizes OCR text, removes leading headings, cleans stray characters,
+        and converts bullet/dot delimiters into separators.
         """
         if not text:
             return ""
-        
+
+        # 1. Convert bullet characters and dots between words to commas before normalization
+        # to prevent them from being collapsed into bare whitespace.
+        text = re.sub(r"[·•●○▪◆\u2022\u00b7\u25cf\u25aa]", ", ", text)
+        # Separate closing parenthesis directly touching the next word: e.g. "Aqua(Water)Niacinamide"
+        text = re.sub(r"(?<=\))(?=[a-zA-Z])", ", ", text)
+        # Separate dot between words/tokens (not numbers): e.g. "EdibleStarch.NoodlePowder" or "(65%).Flavour"
+        text = re.sub(r"(?<=[a-zA-Z0-9\)])\.(?=[a-zA-Z])", ", ", text)
+        # Separate dot followed by space and word (not decimal numbers like 0.5%): e.g. "Vegetable Oil. Wheat Flour"
+        text = re.sub(r"(?<!\d)\.\s+(?=[a-zA-Z])", ", ", text)
+
         # Lowercase and standard unicode normalization per line to preserve line breaks
         lines = text.split("\n")
         cleaned_lines = [normalize_ocr_text(line) for line in lines]
         cleaned = "\n".join(cl for cl in cleaned_lines if cl)
-        
+
         # Remove common ingredient headings/anchors from the start of the text
         heading_patterns = [
-            r'^ingredients\s*[:\-\.]?',
-            r'^ingredient\s*[:\-\.]?',
-            r'^composition\s*[:\-\.]?',
-            r'^contents\s*[:\-\.]?',
-            r'^made from\s*[:\-\.]?',
-            r'^contains\s*[:\-\.]?'
+            r'^[ \t]*ingredients\s*[:\-\.]?',
+            r'^[ \t]*ingredient\s*[:\-\.]?',
+            r'^[ \t]*composition\s*[:\-\.]?',
+            r'^[ \t]*contents\s*[:\-\.]?',
+            r'^[ \t]*made from\s*[:\-\.]?',
+            r'^[ \t]*contains\s*[:\-\.]?'
         ]
-        
+
         for pat in heading_patterns:
-            cleaned = re.sub(pat, '', cleaned, flags=re.IGNORECASE).strip()
-            
+            cleaned = re.sub(pat, '', cleaned, flags=re.IGNORECASE | re.MULTILINE).strip()
+
         return cleaned
 
     def split_phrases(self, text):
@@ -65,7 +76,10 @@ class IngredientCorrector:
                 paren_depth += 1
             elif char == ')':
                 paren_depth = max(0, paren_depth - 1)
-            
+            elif char == '\n':
+                # Unclosed parenthetical expressions reset at text line boundaries
+                paren_depth = 0
+
             if (char in (',', ';', '\n')) and paren_depth == 0:
                 tokens.append("".join(current_token).strip())
                 current_token = []

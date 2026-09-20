@@ -31,6 +31,7 @@ class FoodSafetyResult:
     total_ingredients: int = 0
     warnings: List[str] = field(default_factory=list)
     error: Optional[str] = None
+    risk_class: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {k: v for k, v in asdict(self).items() if v is not None}

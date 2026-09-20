@@ -65,6 +65,15 @@ def process_region(image, region_result, mode, save_prefix, output_dir=None, tes
     if crop is None:
         return None, None, None
 
+    # Small/dense text enhancement: if crop height is small (< 120px), upscale crop
+    # with INTER_CUBIC so PaddleOCR can reliably detect small text lines (DEF-03)
+    if crop.shape[0] < 120 and crop.shape[1] > 100:
+        import cv2
+        scale = max(1.5, 150.0 / crop.shape[0])
+        new_w = int(round(crop.shape[1] * scale))
+        new_h = int(round(crop.shape[0] * scale))
+        crop = cv2.resize(crop, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+
     deskewed, angle = deskew(crop)
     corrected, applied_perspective = correct_perspective(deskewed)
     variants = preprocess_roi(corrected)
@@ -193,25 +202,42 @@ def run_ocr(image_bytes, category="food", output_dir=None, test_mode=False, kb=N
     ingredients_output = []
     best_ingredient_variant = None
     ing_text = ing_ocr.get("best_text", "") if ing_ocr else ""
-    if ing_ocr:
-        best_ingredient_variant = ing_ocr.get("best_variant")
+
+    # DEF-03: If re-OCR on the crop missed text that was already detected during full-image OCR
+    # (e.g. crop re-OCR only saw the heading "INGREDIENTS:" while matched_items has the ingredient lines),
+    # use the matched lines text as a robust fallback/source.
+    matched_lines = ingredient_result.get("matched_items", []) or ingredient_result.get("lines", [])
+    if matched_lines:
+        import re
+        matched_text = "\n".join(ln.get("text", "") for ln in matched_lines if ln.get("text"))
+        cleaned_ing = re.sub(r"^(?:ingredients?|composition|contents)\s*[:\-\.]?", "", ing_text, flags=re.IGNORECASE).strip()
+        cleaned_matched = re.sub(r"^(?:ingredients?|composition|contents)\s*[:\-\.]?", "", matched_text, flags=re.IGNORECASE).strip()
+        if len(cleaned_ing) < 15 or len(cleaned_matched) > 2 * len(cleaned_ing):
+            ing_text = matched_text
+
+    if ing_text:
+        best_ingredient_variant = ing_ocr.get("best_variant") if ing_ocr else "full_image_layout"
         corrector = IngredientCorrector(kb=kb)
         ingredients_output = corrector.correct_and_match(ing_text, domain=domain)
     elif all_text_lower:
-        # Fallback if no specific ingredients region crop succeeded
-        parsed_tokens = parse_ingredients(all_text_lower)
-        if parsed_tokens and kb:
-            matched_kb = kb.match_ingredient_list(parsed_tokens, domain=domain)
-            for tok, m in zip(parsed_tokens, matched_kb):
-                sim = m["similarity"] / 100.0 if m["matched_name"] else None
-                ingredients_output.append({
-                    "ocr_text": tok,
-                    "normalized_text": tok,
-                    "corrected_ingredient": m["matched_name"],
-                    "match_confidence": sim,
-                    "matched_name": m["matched_name"],
-                    "confidence": sim,
-                })
+        # DEF-01: Fallback if no specific ingredients region crop succeeded,
+        # BUT only if all_text_lower actually contains an ingredient heading/anchor.
+        # This prevents front-of-pack/marketing text from being parsed as ingredients.
+        has_anchor = any(anchor in all_text_lower for anchor in config.ALL_INGREDIENT_ANCHORS)
+        if has_anchor:
+            parsed_tokens = parse_ingredients(all_text_lower)
+            if parsed_tokens and kb:
+                matched_kb = kb.match_ingredient_list(parsed_tokens, domain=domain)
+                for tok, m in zip(parsed_tokens, matched_kb):
+                    sim = m["similarity"] / 100.0 if m["matched_name"] else None
+                    ingredients_output.append({
+                        "ocr_text": tok,
+                        "normalized_text": tok,
+                        "corrected_ingredient": m["matched_name"],
+                        "match_confidence": sim,
+                        "matched_name": m["matched_name"],
+                        "confidence": sim,
+                    })
 
     # 13. Parse Nutrition (Food Only)
     nutrition_output = None

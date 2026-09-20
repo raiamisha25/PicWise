@@ -135,11 +135,31 @@ def analyze_food(
                 entry_dict["presentation"] = ing_pres.to_dict()
                 safety_items.append(entry_dict)
 
+            # Compute product-level risk_class using worst-case aggregation:
+            # High Risk > Moderate Risk > Safe > Very Safe
+            product_risk_class = None
+            if safety_items:
+                risk_order = {
+                    "high risk": (4, "High Risk"),
+                    "moderate risk": (3, "Moderate Risk"),
+                    "safe": (2, "Safe"),
+                    "very safe": (1, "Very Safe"),
+                }
+                max_rank = 0
+                for item in safety_items:
+                    rc = item.get("risk_class")
+                    if rc and isinstance(rc, str):
+                        rank, canonical_rc = risk_order.get(rc.lower().strip(), (0, None))
+                        if rank > max_rank:
+                            max_rank = rank
+                            product_risk_class = canonical_rc
+
             food_safety_dict = FoodSafetyResult(
                 status="success",
                 ingredients=safety_items,
                 total_ingredients=len(safety_items),
                 warnings=[],
+                risk_class=product_risk_class,
             ).to_dict()
         except Exception as exc:
             # Component isolation: food safety failure does not crash the entire food analysis
@@ -152,12 +172,12 @@ def analyze_food(
                 total_ingredients=0,
                 warnings=[err_msg],
                 error=str(exc),
+                risk_class=None,
             ).to_dict()
 
     # Food Safety presentation mapping
-    # Note: Food Safety ML operates at the ingredient level. If a component-level risk_class
-    # is explicitly present, it is mapped; otherwise status='unavailable' is preserved
-    # without introducing any unestablished product-level aggregation rule.
+    # Maps product-level risk_class if present; otherwise status='unavailable' is preserved
+    # adhering strictly to Unknown != Safe.
     fs_pres = map_food_safety_status(food_safety_dict.get("risk_class"))
     food_safety_dict["presentation_status"] = fs_pres.status
     food_safety_dict["presentation"] = fs_pres.to_dict()
