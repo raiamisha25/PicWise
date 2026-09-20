@@ -34,24 +34,16 @@ from backend.services.food_status_service import (
 logger = logging.getLogger(__name__)
 
 
-def analyze_food(
+def extract_food_data(
     image_bytes: bytes,
     category: str = "food",
     knowledge_base: Optional[Any] = None,
-) -> FoodAnalysisResult:
+) -> Dict[str, Any]:
     """
-    Orchestrates end-to-end food product analysis.
-
-    Parameters:
-        image_bytes: Raw bytes of the uploaded food product image.
-        category: Must explicitly be 'food'. Any other category or missing value raises InvalidCategoryError.
-        knowledge_base: Optional KnowledgeBase instance for OCR fuzzy matching.
-
-    Returns:
-        FoodAnalysisResult: Unified typed result combining OCR, Food Safety, Nutrition,
-                            and Allergy components.
+    Executes the extraction stage: OCR, ingredient detection, and nutrition parsing.
+    Returns structured raw extraction data for user confirmation prior to analysis.
     """
-    # 1. Category Validation (strictly 'food', no automated category guessing)
+    # 1. Category Validation
     if not category or not isinstance(category, str):
         raise InvalidCategoryError("Category is required and must be 'food'.")
 
@@ -65,59 +57,110 @@ def analyze_food(
     if not image_bytes or len(image_bytes) == 0:
         raise ImageProcessingError("Image bytes are empty or missing.")
 
-    # 3. OCR Pipeline Execution
+    # 3. OCR Execution
     try:
-        # Only pass knowledge_base to OCR if it supports the OCR KB interface (get_ingredient_names)
         ocr_kb = knowledge_base if (knowledge_base and hasattr(knowledge_base, "get_ingredient_names")) else None
         ocr_output = run_ocr(image_bytes, category="food", kb=ocr_kb)
     except Exception as exc:
         err_msg = f"OCR processing failed: {str(exc)}"
         logger.error(err_msg, exc_info=True)
-        # On OCR failure, downstream models are NOT called with fabricated data
-        # Presentation mapping is explicitly unavailable across all dimensions
-        return FoodAnalysisResult(
-            category="food",
-            success=False,
-            ocr=None,
-            food_safety=None,
-            nutrition=None,
-            allergy=None,
-            errors=[err_msg],
-            warnings=[],
-            presentation=map_food_analysis_presentation(None, None, None).to_dict(),
+        return {
+            "success": False,
+            "raw_ingredients": [],
+            "nutrition": None,
+            "raw_text": {},
+            "ocr": None,
+            "warnings": [],
+            "errors": [err_msg],
+        }
+
+    raw_ingredients = ocr_output.get("ingredients", [])
+    raw_nutrition = ocr_output.get("nutrition")
+    raw_text_dict = ocr_output.get("raw_text") or {}
+
+    return {
+        "success": True,
+        "raw_ingredients": raw_ingredients,
+        "nutrition": raw_nutrition,
+        "raw_text": raw_text_dict,
+        "ocr": ocr_output,
+        "warnings": [],
+        "errors": [],
+    }
+
+
+def assess_confirmed_food(
+    confirmed_ingredients: List[Any],
+    nutrition_data: Optional[Dict[str, Any]] = None,
+    raw_text: Optional[Dict[str, Any]] = None,
+    category: str = "food",
+    knowledge_base: Optional[Any] = None,
+    ocr_output: Optional[Dict[str, Any]] = None,
+) -> FoodAnalysisResult:
+    """
+    Executes the downstream assessment stage: Food Safety ML and Allergy lookup
+    on confirmed ingredients, deterministic Nutrition scoring on package nutrition facts,
+    and presentation mapping.
+    """
+    if not category or not isinstance(category, str):
+        raise InvalidCategoryError("Category is required and must be 'food'.")
+
+    category_norm = category.strip().lower()
+    if category_norm != "food":
+        raise InvalidCategoryError(
+            f"Invalid category '{category}'. The Food Analysis service strictly handles 'food'."
         )
 
     all_warnings: List[str] = []
+    raw_text_dict = raw_text or {}
+    product_text = raw_text_dict.get("all_text", "")
+    ingredient_text = raw_text_dict.get("ingredients_text", "")
 
-    # 4. Food Safety ML Inference
-    raw_ingredients = ocr_output.get("ingredients", [])
+    # Normalize confirmed ingredients into standardized dict format
+    normalized_confirmed: List[Dict[str, Any]] = []
+    for item in (confirmed_ingredients or []):
+        if isinstance(item, str):
+            clean_str = item.strip()
+            if clean_str:
+                normalized_confirmed.append({
+                    "raw_text": clean_str,
+                    "matched_name": clean_str,
+                    "name": clean_str,
+                    "method": "user_confirmed",
+                })
+        elif isinstance(item, dict):
+            name_str = (
+                item.get("matched_name")
+                or item.get("raw_text")
+                or item.get("ocr_text")
+                or item.get("name")
+                or ""
+            ).strip()
+            if name_str:
+                normalized_confirmed.append({
+                    "raw_text": item.get("raw_text") or item.get("ocr_text") or name_str,
+                    "matched_name": item.get("matched_name") or name_str,
+                    "name": name_str,
+                    "method": item.get("method") or "user_confirmed",
+                })
+
+    # 1. Food Safety ML Inference
     food_safety_dict: Dict[str, Any]
-
-    if not raw_ingredients:
-        no_ing_warning = "No ingredients detected in OCR output."
+    if not normalized_confirmed:
+        no_ing_warning = "No ingredients detected or confirmed for food safety analysis."
         all_warnings.append(no_ing_warning)
         food_safety_dict = FoodSafetyResult(
             status="no_ingredients",
             ingredients=[],
             total_ingredients=0,
             warnings=[no_ing_warning],
+            risk_class=None,
         ).to_dict()
     else:
         try:
             safety_items: List[Dict[str, Any]] = []
-            for item in raw_ingredients:
-                target_name = (
-                    item.get("matched_name")
-                    or item.get("raw_text")
-                    or item.get("ocr_text")
-                    or item.get("name")
-                    or ""
-                ).strip()
-
-                if not target_name:
-                    continue
-
-                # Production Food Safety ML inference (Frozen TF-IDF + MiniLM + Balanced LogReg)
+            for item in normalized_confirmed:
+                target_name = item["name"]
                 pred = predict_food_safety(target_name)
 
                 safety_entry = FoodSafetyIngredientResult(
@@ -125,9 +168,9 @@ def analyze_food(
                     risk_class=pred.get("risk_class"),
                     confidence=float(pred.get("confidence", 0.0)),
                     probabilities=pred.get("probabilities", {}),
-                    raw_text=item.get("raw_text") or item.get("ocr_text") or "",
+                    raw_text=item.get("raw_text", ""),
                     matched_name=item.get("matched_name"),
-                    match_type=item.get("method", "unmatched"),
+                    match_type=item.get("method", "user_confirmed"),
                 )
                 entry_dict = safety_entry.to_dict()
                 ing_pres = map_food_safety_status(pred.get("risk_class"))
@@ -135,7 +178,7 @@ def analyze_food(
                 entry_dict["presentation"] = ing_pres.to_dict()
                 safety_items.append(entry_dict)
 
-            # Compute product-level risk_class using worst-case aggregation:
+            # Worst-case product risk class aggregation:
             # High Risk > Moderate Risk > Safe > Very Safe
             product_risk_class = None
             if safety_items:
@@ -162,7 +205,6 @@ def analyze_food(
                 risk_class=product_risk_class,
             ).to_dict()
         except Exception as exc:
-            # Component isolation: food safety failure does not crash the entire food analysis
             err_msg = f"Food safety inference encountered an error: {str(exc)}"
             logger.error(err_msg, exc_info=True)
             all_warnings.append(err_msg)
@@ -175,23 +217,15 @@ def analyze_food(
                 risk_class=None,
             ).to_dict()
 
-    # Food Safety presentation mapping
-    # Maps product-level risk_class if present; otherwise status='unavailable' is preserved
-    # adhering strictly to Unknown != Safe.
     fs_pres = map_food_safety_status(food_safety_dict.get("risk_class"))
     food_safety_dict["presentation_status"] = fs_pres.status
     food_safety_dict["presentation"] = fs_pres.to_dict()
 
-    # 5. Nutrition Scoring Engine Execution
-    raw_nutrition = ocr_output.get("nutrition")
-    raw_text_dict = ocr_output.get("raw_text") or {}
-    product_text = raw_text_dict.get("all_text", "")
-    ingredient_text = raw_text_dict.get("ingredients_text", "")
-
+    # 2. Nutrition Scoring Engine Execution (from package nutrition facts)
     nutrition_dict: Dict[str, Any]
     try:
         nutrition_res = calculate_nutrition_score(
-            raw_nutrition=raw_nutrition,
+            raw_nutrition=nutrition_data,
             category="food",
             product_text=product_text,
             ingredient_text=ingredient_text,
@@ -201,7 +235,6 @@ def analyze_food(
         if nutrition_dict.get("warnings"):
             all_warnings.extend(nutrition_dict["warnings"])
     except Exception as exc:
-        # Component isolation: nutrition error does not crash other components
         nut_err_msg = f"Nutrition scoring engine encountered an error: {str(exc)}"
         logger.error(nut_err_msg, exc_info=True)
         all_warnings.append(nut_err_msg)
@@ -212,7 +245,6 @@ def analyze_food(
             "error": str(exc),
         }
 
-    # Nutrition presentation mapping
     nut_score = nutrition_dict.get("nutrition_score")
     nut_pres = map_nutrition_status(
         score=nut_score,
@@ -225,11 +257,11 @@ def analyze_food(
     if "label" not in nutrition_dict:
         nutrition_dict["label"] = nut_pres.label
 
-    # 6. Allergy Pipeline Execution (Deterministic Knowledge Base Lookup)
+    # 3. Allergy Pipeline Execution (Deterministic KB lookup on confirmed ingredients)
     allergy_dict: Dict[str, Any]
     try:
         allergy_res = calculate_allergy_risk(
-            ingredients=raw_ingredients,
+            ingredients=normalized_confirmed,
             category="food",
             knowledge_base=knowledge_base,
         )
@@ -237,7 +269,6 @@ def analyze_food(
         if allergy_dict.get("warnings"):
             all_warnings.extend(allergy_dict["warnings"])
     except Exception as exc:
-        # Component isolation: allergy lookup error does not crash the entire food analysis
         all_err_msg = f"Allergy risk lookup encountered an error: {str(exc)}"
         logger.error(all_err_msg, exc_info=True)
         all_warnings.append(all_err_msg)
@@ -247,7 +278,6 @@ def analyze_food(
             error=str(exc),
         ).to_dict()
 
-    # Allergy presentation mapping
     al_risk = allergy_dict.get("product_risk_level") or allergy_dict.get("risk_level")
     al_pres = map_allergy_status(
         risk_level=al_risk,
@@ -260,7 +290,7 @@ def analyze_food(
     if "ui_label" not in allergy_dict and allergy_dict.get("product_ui_label"):
         allergy_dict["ui_label"] = allergy_dict.get("product_ui_label")
 
-    # 7. Presentation Status Mapping across independent dimensions (Phase 9H)
+    # 4. Presentation Status Mapping across independent dimensions
     presentation_dict: Optional[Dict[str, Any]] = None
     try:
         presentation_obj = map_food_analysis_presentation(
@@ -274,15 +304,14 @@ def analyze_food(
         logger.error(pres_err_msg, exc_info=True)
         all_warnings.append(pres_err_msg)
         presentation_dict = {
-            "food_safety": {"status": "unavailable"},
-            "allergy": {"status": "unavailable"},
-            "nutrition": {"status": "unavailable"},
+            "food_safety": {"status": "unavailable", "label": "Unavailable"},
+            "allergy": {"status": "unavailable", "label": "Unavailable"},
+            "nutrition": {"status": "unavailable", "label": "Unavailable", "score": None},
         }
 
-    # 8. Assemble Unified Result
     logger.info(
-        "Food analysis completed. Ingredients: %d, Allergy status: %s, Nutrition score: %s",
-        len(raw_ingredients),
+        "Food assessment completed. Confirmed ingredients: %d, Allergy: %s, Nutrition score: %s",
+        len(normalized_confirmed),
         allergy_dict.get("presentation_status"),
         str(nutrition_dict.get("nutrition_score")),
     )
@@ -296,4 +325,38 @@ def analyze_food(
         errors=[],
         warnings=all_warnings,
         presentation=presentation_dict,
+    )
+
+
+def analyze_food(
+    image_bytes: bytes,
+    category: str = "food",
+    knowledge_base: Optional[Any] = None,
+) -> FoodAnalysisResult:
+    """
+    Orchestrates end-to-end food product analysis.
+    Direct single-call pipeline (runs extraction then immediate assessment).
+    Preserves 100% backward compatibility for existing callers and test suites.
+    """
+    extract_data = extract_food_data(image_bytes, category=category, knowledge_base=knowledge_base)
+    if not extract_data.get("success"):
+        return FoodAnalysisResult(
+            category="food",
+            success=False,
+            ocr=None,
+            food_safety=None,
+            nutrition=None,
+            allergy=None,
+            errors=extract_data.get("errors", ["OCR processing failed"]),
+            warnings=[],
+            presentation=map_food_analysis_presentation(None, None, None).to_dict(),
+        )
+
+    return assess_confirmed_food(
+        confirmed_ingredients=extract_data.get("raw_ingredients", []),
+        nutrition_data=extract_data.get("nutrition"),
+        raw_text=extract_data.get("raw_text", {}),
+        category=category,
+        knowledge_base=knowledge_base,
+        ocr_output=extract_data.get("ocr"),
     )

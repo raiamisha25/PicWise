@@ -2,7 +2,7 @@
   "model_name": "PicWise Food Safety Classifier",
   "model_type": "Dual-stream Character TF-IDF + Pretrained MiniLM + Balanced Logistic Regression",
   "version": "1.0.0",
-  "serialization_date": "2026-09-15T10:00:44.823390+00:00",
+  "serialization_date": "2026-09-20T10:57:07.686691+00:00",
   "random_seed": 42,
   "dataset": {
     "source_path": "data/food/food_ingredients_dataset_final.csv",

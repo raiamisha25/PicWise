@@ -37,155 +37,145 @@
           </div>
         </div>
 
-        <label id="dropZone" class="drop-zone" for="imageInput">
-          <input id="imageInput" name="image" type="file" accept="image/jpeg,image/png,image/webp">
+        <div id="dropZone" class="drop-zone">
+          <input id="imageInput" name="images[]" type="file" accept="image/jpeg,image/png,image/webp" multiple>
           <span class="drop-camera"><span class="camera-icon"></span></span>
-          <span class="drop-title">Drop a label image here</span>
-          <span class="drop-subtitle">JPG, JPEG, PNG, or WEBP</span>
-        </label>
+          <span class="drop-title">Drop product label images here</span>
+          <span class="drop-subtitle">JPG, JPEG, PNG, or WEBP (Add any number of products)</span>
+        </div>
 
         <p id="fileError" class="inline-error" role="alert"></p>
 
-        <div id="previewWrap" class="preview-wrap hidden">
-          <img id="previewImage" alt="Selected product label preview">
-          <button id="removeImage" class="secondary-action" type="button">Remove image</button>
+        <!-- Dynamic Product Queue Container -->
+        <div id="productQueueWrap" class="product-queue-wrap hidden">
+          <div class="queue-header-row">
+            <h3 class="queue-heading">Products to Analyze (<span id="queueCount">0</span>)</h3>
+            <button id="clearQueueBtn" class="secondary-action text-btn" type="button">Clear All</button>
+          </div>
+          <div id="productQueueList" class="product-queue-list"></div>
+          <div class="add-more-row">
+            <label for="imageInput" class="secondary-action add-product-label">
+              <span>+ Add Product</span>
+            </label>
+          </div>
         </div>
 
         <button id="analyzeButton" class="primary-action" type="submit" disabled>
           <span class="button-icon camera-small"></span>
-          Analyze
+          <span id="analyzeBtnText">Analyze All Products</span>
         </button>
       </form>
     </div>
 
     <aside class="card scan-helper">
       <h2>Ready for Safer Choices</h2>
-      <p>PicWise checks the uploaded label against food, nutrition, and personal-care knowledge bases.</p>
+      <p>PicWise independently assesses every product across Food Safety, Allergy Risk, and Nutrition with zero composite score.</p>
       <div class="helper-stat">
         <span>Knowledge rows</span>
         <strong>1,333+</strong>
       </div>
       <div class="helper-stat">
-        <span>OCR status</span>
-        <strong>Integrated (PaddleOCR)</strong>
+        <span>Analysis Mode</span>
+        <strong>Multi-Product Independent</strong>
       </div>
     </aside>
   </section>
 
   <section id="loadingState" class="status-panel card hidden" aria-live="polite">
     <div class="spinner"></div>
-    <h2>Analyzing your product...</h2>
-    <p>PicWise is sending the label through the Phase 1 API pipeline.</p>
+    <h2 id="loadingTitle">Analyzing your product(s)...</h2>
+    <p id="loadingDesc">PicWise is running OCR and extracting label data.</p>
   </section>
 
+  <!-- Step 2: User Confirmation & Editing of OCR Ingredients -->
+  <section id="confirmationPanel" class="confirmation-panel card hidden" aria-live="polite">
+    <div class="section-title-row">
+      <div>
+        <h2>Confirm Detected Ingredients</h2>
+        <p>OCR has extracted ingredients from your product label. Please review, edit, or add ingredients before running Food Safety and Allergy analysis.</p>
+      </div>
+      <span id="confirmationProductCounter" class="status-pill status-counter">Product 1 of 1</span>
+    </div>
+
+    <div id="confirmationProductCard" class="confirmation-product-card">
+      <div class="confirmation-product-header">
+        <div class="confirmation-thumb-wrap">
+          <img id="confirmationProductThumb" alt="Product thumbnail" class="confirmation-thumb">
+        </div>
+        <div class="confirmation-product-meta">
+          <h3 id="confirmationProductTitle">Product 1</h3>
+          <span id="confirmationProductFilename" class="confirmation-filename">filename.jpg</span>
+        </div>
+      </div>
+
+      <!-- Detected Ingredients Review State -->
+      <div id="confirmationDetectedWrap" class="confirmation-detected-wrap">
+        <div class="confirmation-prompt-box">
+          <strong>Ingredients detected</strong>
+          <p>Please check whether the ingredient list is correct.</p>
+        </div>
+
+        <div id="confirmationIngredientsChecklist" class="confirmation-ingredients-checklist"></div>
+
+        <div class="confirmation-actions-row">
+          <button id="confirmYesBtn" class="primary-action" type="button">✓ Yes, Continue</button>
+          <button id="confirmEditBtn" class="secondary-action" type="button">Edit Ingredients</button>
+        </div>
+      </div>
+
+      <!-- Edit Ingredients Form -->
+      <div id="confirmationEditWrap" class="confirmation-edit-wrap hidden">
+        <div class="confirmation-prompt-box">
+          <strong>Edit Ingredients</strong>
+          <p>Modify detected names, remove inaccurate entries, or add missing ingredients.</p>
+        </div>
+
+        <div id="confirmationEditList" class="confirmation-edit-list"></div>
+
+        <div class="edit-toolbar-row">
+          <button id="confirmationAddIngBtn" class="secondary-action add-ing-btn" type="button">+ Add Ingredient</button>
+        </div>
+
+        <div class="confirmation-actions-row">
+          <button id="confirmationSaveBtn" class="primary-action" type="button">Save & Continue</button>
+          <button id="confirmationCancelEditBtn" class="secondary-action" type="button">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Empty / Bad OCR case -->
+      <div id="confirmationEmptyWrap" class="confirmation-empty-wrap hidden">
+        <div class="empty-ocr-box">
+          <span class="empty-icon">⚠️</span>
+          <h4>We couldn't reliably detect the ingredient list.</h4>
+          <p>You can enter the ingredients manually below to analyze Food Safety and Allergy risk.</p>
+        </div>
+
+        <div id="confirmationManualList" class="confirmation-edit-list"></div>
+
+        <div class="edit-toolbar-row">
+          <button id="confirmationManualAddBtn" class="secondary-action add-ing-btn" type="button">+ Add Ingredient</button>
+        </div>
+
+        <div class="confirmation-actions-row">
+          <button id="confirmationManualContinueBtn" class="primary-action" type="button">Continue</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Step 3: Results Panel -->
   <section id="resultsPanel" class="results-panel card hidden" aria-live="polite">
     <!-- Food Analysis Results Container -->
     <div id="foodResultsContainer" class="hidden">
       <div class="section-title-row results-heading">
         <div>
-          <h2>Food Product Analysis</h2>
-          <p>Independent assessments across Safety, Nutrition, and Allergens.</p>
+          <h2>Food Product Analysis Results</h2>
+          <p>Independent assessments across Safety, Nutrition, and Allergens for each product.</p>
         </div>
       </div>
 
-      <!-- Food Warnings Banner (Hidden by default, displayed if warnings exist) -->
-      <div id="foodWarningsBanner" class="warning-banner hidden" role="alert">
-        <div class="warning-banner-icon">
-          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-        </div>
-        <div class="warning-banner-content">
-          <strong>Notices & Warnings</strong>
-          <ul id="foodWarningsList"></ul>
-        </div>
-      </div>
-
-      <!-- Three Independent Dimension Cards Grid -->
-      <div class="food-cards-grid">
-        <!-- 1. Food Safety Card -->
-        <div id="foodSafetyCard" class="dimension-card">
-          <div class="card-header-row">
-            <div class="dimension-title-group">
-              <span class="dimension-icon">🛡️</span>
-              <div>
-                <h3 class="dimension-title">Food Safety</h3>
-                <span class="dimension-subtitle">ML-based ingredient classification</span>
-              </div>
-            </div>
-            <span id="foodSafetyStatusBadge" class="status-pill unavailable">Unavailable</span>
-          </div>
-
-          <div class="dimension-body">
-            <div class="meta-stat-row">
-              <span class="meta-label">Ingredients Assessed:</span>
-              <strong id="foodSafetyCount" class="meta-value">0</strong>
-            </div>
-
-            <div class="ingredient-breakdown">
-              <h4 class="breakdown-title">Ingredient Risk Breakdown</h4>
-              <div id="foodSafetyIngredientsList" class="ingredient-badges-list"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 2. Nutrition Card -->
-        <div id="nutritionCard" class="dimension-card">
-          <div class="card-header-row">
-            <div class="dimension-title-group">
-              <span class="dimension-icon">🥗</span>
-              <div>
-                <h3 class="dimension-title">Nutrition</h3>
-                <span class="dimension-subtitle">Deterministic 0–100 profiling</span>
-              </div>
-            </div>
-            <span id="nutritionStatusBadge" class="status-pill unavailable">Unavailable</span>
-          </div>
-
-          <div class="dimension-body">
-            <div class="nutrition-score-box">
-              <span class="score-label">Nutrition Score</span>
-              <div class="score-value-row">
-                <span id="nutritionScoreValue" class="score-number">—</span>
-                <span id="nutritionScoreDenominator" class="score-denominator">/ 100</span>
-              </div>
-              <span id="nutritionScoreNote" class="score-note"></span>
-            </div>
-
-            <div class="nutrition-nutrients-section">
-              <h4 class="breakdown-title">Key Nutrients</h4>
-              <div id="nutritionNutrientsList" class="nutrients-grid"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 3. Allergy Risk Card -->
-        <div id="allergyCard" class="dimension-card">
-          <div class="card-header-row">
-            <div class="dimension-title-group">
-              <span class="dimension-icon">⚠️</span>
-              <div>
-                <h3 class="dimension-title">Allergy Risk</h3>
-                <span class="dimension-subtitle">Knowledge-base allergen lookup</span>
-              </div>
-            </div>
-            <span id="allergyStatusBadge" class="status-pill unavailable">Unavailable</span>
-          </div>
-
-          <div class="dimension-body">
-            <div class="allergy-content-section">
-              <h4 class="breakdown-title">Detected Allergens</h4>
-              <!-- Allergen list populated strictly from backend allergens_detected -->
-              <div id="allergyDetectedContainer" class="allergy-detected-wrap">
-                <div id="allergyDetectedList" class="allergen-pills-wrap"></div>
-                <p id="allergyEmptyNotice" class="allergy-empty-notice hidden">No specific allergens detected in scanned ingredients.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- Dynamic Multi-Product Result Cards Grid -->
+      <div id="multiProductResultsGrid" class="multi-product-results-grid"></div>
     </div>
 
     <!-- Personal Care Results Container (Phase 10B) -->

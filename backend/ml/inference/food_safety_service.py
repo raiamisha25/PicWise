@@ -14,7 +14,7 @@ import numpy as np
 from scipy.sparse import csr_matrix, hstack
 from sentence_transformers import SentenceTransformer
 
-DEFAULT_FOOD_SAFETY_MODEL_DIR = "backend/ml/models/food_safety"
+DEFAULT_FOOD_SAFETY_MODEL_DIR = PROJECT_ROOT / "backend" / "ml" / "models" / "food_safety"
 CANONICAL_CLASSES = ["Very Safe", "Safe", "Moderate Risk", "High Risk"]
 
 
@@ -28,8 +28,8 @@ class FoodSafetyPredictor:
     _instance = None
     _lock = threading.Lock()
 
-    def __init__(self, model_dir=DEFAULT_FOOD_SAFETY_MODEL_DIR):
-        self.model_dir = Path(model_dir)
+    def __init__(self, model_dir=None):
+        self.model_dir = Path(model_dir).resolve() if model_dir else DEFAULT_FOOD_SAFETY_MODEL_DIR
         self.vectorizer = None
         self.classifier = None
         self.metadata = None
@@ -41,7 +41,7 @@ class FoodSafetyPredictor:
         self._load_artifacts()
 
     @classmethod
-    def get_instance(cls, model_dir=DEFAULT_FOOD_SAFETY_MODEL_DIR):
+    def get_instance(cls, model_dir=None):
         """Thread-safe singleton accessor."""
         if cls._instance is None:
             with cls._lock:
@@ -63,6 +63,20 @@ class FoodSafetyPredictor:
 
         self.vectorizer = joblib.load(vectorizer_path)
         self.classifier = joblib.load(classifier_path)
+
+        # Sanity check: verify vectorizer is fitted with idf_
+        if not hasattr(self.vectorizer, "idf_") or not hasattr(self.vectorizer, "_tfidf") or not hasattr(self.vectorizer._tfidf, "idf_"):
+            raise ValueError(
+                f"Loaded vectorizer from {vectorizer_path} is missing fitted idf_ attribute."
+            )
+
+        # Perform test transform
+        try:
+            self.vectorizer.transform(["test"])
+        except Exception as e:
+            raise ValueError(
+                f"Loaded vectorizer failed transform test: {e}. Re-serialization under runtime scikit-learn may be required."
+            ) from e
 
         with open(metadata_path, "r", encoding="utf-8") as f:
             self.metadata = json.load(f)
